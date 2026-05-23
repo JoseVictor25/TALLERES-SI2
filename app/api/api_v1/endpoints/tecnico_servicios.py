@@ -20,7 +20,7 @@ from app.models.taller import Taller
 from app.models.vehiculo_taller import VehiculoTaller
 from app.models.rol_usuario import RolUsuario
 from app.models.rol import Rol
-from app.models.historial_estados_servicio import HistorialEstadosServicio, EstadoHistorial
+from app.models.historial_estado_servicio import HistorialEstadoServicio
 from app.models.metrica import Metrica
 from app.models.ubicacion_tecnico import UbicacionTecnico
 from app.crud import empleado as empleado_crud
@@ -504,27 +504,21 @@ async def actualizar_estado_servicio(
         
         # 1. Obtener el historial previo para calcular el tiempo
         result = await db.execute(
-            select(HistorialEstadosServicio)
-            .where(HistorialEstadosServicio.id_servicio == servicio_id)
-            .order_by(HistorialEstadosServicio.fecha.desc())
+            select(HistorialEstadoServicio)
+            .where(HistorialEstadoServicio.id_servicio == servicio_id)
+            .order_by(HistorialEstadoServicio.tiempo.desc())
             .limit(1)
         )
         ultimo_estado = result.scalar_one_or_none()
-        
-        tiempo_desde_anterior = None
-        if ultimo_estado:
-            diferencia = ahora - ultimo_estado.fecha
-            tiempo_desde_anterior = diferencia.total_seconds()
             
         # 2. Actualizar servicio
         servicio.estado = EstadoServicio(nuevo_estado)
         
         # 3. Registrar en Historial
-        nuevo_historial = HistorialEstadosServicio(
+        nuevo_historial = HistorialEstadoServicio(
             id_servicio=servicio_id,
-            estado=EstadoHistorial(nuevo_estado),
-            fecha=ahora,
-            tiempo_desde_anterior=tiempo_desde_anterior
+            estado=EstadoServicio(nuevo_estado),
+            tiempo=ahora
         )
         db.add(nuevo_historial)
         
@@ -538,11 +532,6 @@ async def actualizar_estado_servicio(
             if not metrica:
                 metrica = Metrica(id_servicio=servicio_id)
                 db.add(metrica)
-                
-            if nuevo_estado == 'en_lugar' and ultimo_estado and ultimo_estado.estado.value == 'en_camino':
-                metrica.tiempo_llegada = tiempo_desde_anterior
-            elif nuevo_estado == 'finalizado' and ultimo_estado and ultimo_estado.estado.value == 'en_atencion':
-                metrica.tiempo_resolucion = tiempo_desde_anterior
         
         await db.commit()
         await db.refresh(servicio)

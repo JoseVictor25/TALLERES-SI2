@@ -41,7 +41,7 @@ logs/
 # ─── Archivos de audio/modelo IA (Whisper descarga en runtime)
 *.pt
 *.bin
-models/
+/models/
 whisper_models/
 
 # ─── IDEs ────────────────────────────────────────────────────

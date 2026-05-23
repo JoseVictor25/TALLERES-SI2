@@ -10,7 +10,7 @@ class EvidenciaResponse(BaseModel):
     tipo: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class IncidenteResponse(BaseModel):
@@ -40,7 +40,7 @@ class IncidenteResponse(BaseModel):
         return values
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class DiagnosticoResponse(BaseModel):
@@ -51,7 +51,7 @@ class DiagnosticoResponse(BaseModel):
     incidentes: List[IncidenteResponse] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SolicitudDiagnosticoResponse(BaseModel):
@@ -65,4 +65,4 @@ class SolicitudDiagnosticoResponse(BaseModel):
     diagnostico: Optional[DiagnosticoResponse] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

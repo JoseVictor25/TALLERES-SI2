@@ -16,7 +16,7 @@ class ValoracionResponse(BaseModel):
     id_servicio: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ValoracionUpdate(BaseModel):

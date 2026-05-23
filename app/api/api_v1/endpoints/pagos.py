@@ -20,7 +20,7 @@ from app.models.empleado import Empleado
 from app.models.rol_usuario import RolUsuario
 from app.models.rol import Rol
 from app.core.constants import ROL_TECNICO
-from app.models.historial_estados_servicio import HistorialEstadosServicio, EstadoHistorial
+from app.models.historial_estado_servicio import HistorialEstadoServicio
 from app.models.metrica import Metrica
 from app.services.stripe_service import crear_sesion_checkout, verificar_webhook
 
@@ -89,26 +89,21 @@ async def _finalizar_servicio(db: AsyncSession, servicio: Servicio):
     
     # Calcular tiempo de resolución
     result = await db.execute(
-        select(HistorialEstadosServicio)
-        .where(HistorialEstadosServicio.id_servicio == servicio.id)
-        .order_by(HistorialEstadosServicio.fecha.desc())
+        select(HistorialEstadoServicio)
+        .where(HistorialEstadoServicio.id_servicio == servicio.id)
+        .order_by(HistorialEstadoServicio.tiempo.desc())
         .limit(1)
     )
     ultimo_estado = result.scalar_one_or_none()
     
-    tiempo_desde_anterior = None
-    if ultimo_estado:
-        tiempo_desde_anterior = (ahora - ultimo_estado.fecha).total_seconds()
-        
     # Cambiar estado
     servicio.estado = EstadoServicio.finalizado
     
     # Historial
-    nuevo_historial = HistorialEstadosServicio(
+    nuevo_historial = HistorialEstadoServicio(
         id_servicio=servicio.id,
-        estado=EstadoHistorial.finalizado,
-        fecha=ahora,
-        tiempo_desde_anterior=tiempo_desde_anterior
+        estado=EstadoServicio.finalizado,
+        tiempo=ahora
     )
     db.add(nuevo_historial)
     

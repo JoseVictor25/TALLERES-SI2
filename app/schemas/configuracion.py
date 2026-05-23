@@ -18,7 +18,7 @@ class ConfiguracionResponse(BaseModel):
     id_usuario: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ConfiguracionListResponse(BaseModel):
     items: List[ConfiguracionResponse]

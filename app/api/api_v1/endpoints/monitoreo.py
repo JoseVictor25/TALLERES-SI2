@@ -23,7 +23,7 @@ from app.models.taller import Taller
 from app.models.empleado import Empleado
 from app.models.vehiculo_taller import VehiculoTaller
 from app.models.persona import Persona
-from app.models.historial_estados_servicio import HistorialEstadosServicio
+from app.models.historial_estado_servicio import HistorialEstadoServicio
 from app.models.metrica import Metrica
 from app.models.ubicacion_tecnico import UbicacionTecnico
 from app.models.rol_usuario import RolUsuario

@@ -14,7 +14,7 @@ class TecnicoDisponibleResponse(BaseModel):
     estado: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class VehiculoTallerDisponibleResponse(BaseModel):
@@ -26,7 +26,7 @@ class VehiculoTallerDisponibleResponse(BaseModel):
     estado: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # ============================================================
@@ -38,7 +38,7 @@ class TecnicoAsignadoResponse(BaseModel):
     nombre_completo: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class VehiculoAsignadoResponse(BaseModel):
@@ -48,7 +48,7 @@ class VehiculoAsignadoResponse(BaseModel):
     modelo: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ServicioResponse(BaseModel):
@@ -61,7 +61,7 @@ class ServicioResponse(BaseModel):
     vehiculos_asignados: List[VehiculoAsignadoResponse] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ServicioCreate(BaseModel):
@@ -81,7 +81,7 @@ class EvidenciaDetalleResponse(BaseModel):
     transcripcion: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class VehiculoClienteResponse(BaseModel):
@@ -93,7 +93,7 @@ class VehiculoClienteResponse(BaseModel):
     tipo: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class DiagnosticoDetalleResponse(BaseModel):
@@ -103,7 +103,7 @@ class DiagnosticoDetalleResponse(BaseModel):
     fecha: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SolicitudServicioDetalleResponse(BaseModel):
@@ -129,7 +129,7 @@ class SolicitudServicioDetalleResponse(BaseModel):
     descripcion_conductor: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SolicitudServicioListResponse(BaseModel):
@@ -143,7 +143,7 @@ class SolicitudServicioListResponse(BaseModel):
     tiene_servicio: bool = False
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # ============================================================
@@ -161,7 +161,7 @@ class TallerInfoResponse(BaseModel):
     puntos: float
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ServicioClienteResponse(BaseModel):
@@ -186,7 +186,7 @@ class ServicioClienteResponse(BaseModel):
     diagnostico: Optional[DiagnosticoDetalleResponse] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ServicioClienteListResponse(BaseModel):
@@ -198,4 +198,4 @@ class ServicioClienteListResponse(BaseModel):
     diagnostico_descripcion: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True

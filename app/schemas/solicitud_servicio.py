@@ -12,7 +12,7 @@ class TallerBasicInfo(BaseModel):
     puntos: float
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SolicitudServicioResponse(BaseModel):
@@ -29,7 +29,7 @@ class SolicitudServicioResponse(BaseModel):
     taller: Optional[TallerBasicInfo] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SolicitudServicioCreate(BaseModel):
