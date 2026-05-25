@@ -34,8 +34,14 @@ async def create_empleado(
         raise HTTPException(status_code=400, detail="El usuario ya es empleado activo en este taller")
     
     # 3. Obtener el rol correspondiente
-    rol_nombre = data.rol.value
+    ROL_MAP = {
+        "admin_taller":       "Administrador del Taller",
+        "super_admin_taller": "Administrador del Taller",
+    }
+    rol_nombre = ROL_MAP.get(data.rol.value, data.rol.value)
+
     rol = await crud_rol.get_by_nombre(db, rol_nombre)
+
     if not rol:
         raise HTTPException(status_code=500, detail=f"Rol {rol_nombre} no encontrado")
     
