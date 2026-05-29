@@ -64,4 +64,6 @@ tmp/
 temp/
 *.tmp
 *.bak
-.cache/
+.cache/ 
+
+talleres.json
