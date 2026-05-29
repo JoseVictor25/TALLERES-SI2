@@ -138,6 +138,15 @@ async def buscar_talleres_cercanos_con_especialidades(
     talleres_validos = []
     
     for taller, distancia in talleres_cercanos:
+        # Si no hay especialidades requeridas, agregar el taller directamente
+        if not especialidades_requeridas:
+            talleres_validos.append({
+                'taller': taller,
+                'distancia_km': round(distancia / 1000, 2),
+                'especialidades_disponibles': []
+            })
+            continue
+
         # Verificar que el taller tenga técnicos con al menos una especialidad requerida
         especialidades_query = select(TecnicoEspecialidad.id_especialidad).join(
             Empleado, Empleado.id == TecnicoEspecialidad.id_empleado
@@ -212,19 +221,15 @@ async def crear_solicitudes_servicio_automaticas(
     # Obtener especialidades requeridas
     especialidades_ids = await obtener_especialidades_requeridas(db, id_diagnostico)
     
+    nombres_especialidades = []
     if not especialidades_ids:
-        logger.warning(f"No se encontraron especialidades requeridas para diagnóstico {id_diagnostico}")
-        return {
-            'solicitudes_creadas': 0,
-            'talleres_sugeridos': [],
-            'especialidades_requeridas': []
-        }
-    
-    # Obtener nombres de especialidades
-    result = await db.execute(
-        select(Especialidad.nombre).where(Especialidad.id.in_(especialidades_ids))
-    )
-    nombres_especialidades = [row[0] for row in result.all()]
+        logger.info(f"No se encontraron especialidades requeridas para diagnóstico {id_diagnostico}, buscando todos los talleres cercanos")
+    else:
+        # Obtener nombres de especialidades
+        result = await db.execute(
+            select(Especialidad.nombre).where(Especialidad.id.in_(especialidades_ids))
+        )
+        nombres_especialidades = [row[0] for row in result.all()]
     
     # Obtener distancia máxima
     distancia_maxima = await obtener_distancia_maxima(db)

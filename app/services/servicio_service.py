@@ -24,6 +24,7 @@ from app.models.vehiculo_taller import VehiculoTaller, EstadoVehiculoTaller
 from app.models.usuario import Usuario
 from app.models.rol_usuario import RolUsuario
 from app.models.rol import Rol
+from app.core.constants import ROL_TECNICO
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ async def obtener_tecnicos_disponibles(
         ).where(
             and_(
                 RolUsuario.id_taller == id_taller,
-                Rol.nombre == "tecnico",
+                Rol.nombre == ROL_TECNICO,
                 Empleado.estado == EstadoEmpleado.disponible
             )
         ).options(selectinload(Empleado.usuario)).distinct()

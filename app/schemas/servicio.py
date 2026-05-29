@@ -199,3 +199,57 @@ class ServicioClienteListResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# ============================================================
+# SCHEMAS PARA SEGUIMIENTO EN TIEMPO REAL (CLIENTE MÓVIL)
+# ============================================================
+
+class TecnicoUbicacionResponse(BaseModel):
+    """Ubicación en tiempo real de un técnico asignado"""
+    id_empleado: int
+    nombre_completo: str
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
+    timestamp: Optional[datetime] = None
+    tiene_ubicacion: bool
+
+    class Config:
+        from_attributes = True
+
+
+class EstadoHistorialClienteResponse(BaseModel):
+    """Un estado en el historial de un servicio"""
+    estado: str
+    estado_descripcion: str
+    tiempo: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ServicioSeguimientoClienteResponse(BaseModel):
+    """Schema completo de seguimiento del servicio para el cliente móvil.
+    Incluye historial de estados y ubicaciones de técnicos en tiempo real."""
+    id: int
+    fecha: datetime
+    estado: str
+    estado_descripcion: str
+
+    # Información del taller
+    taller: TallerInfoResponse
+
+    # Técnicos con su ubicación GPS actual
+    tecnicos: List[TecnicoUbicacionResponse] = []
+
+    # Historial de cambios de estado
+    historial_estados: List[EstadoHistorialClienteResponse] = []
+
+    # Ubicación del cliente (de la solicitud original) "lat,lon"
+    ubicacion_cliente: Optional[str] = None
+
+    # Descripción del diagnóstico
+    diagnostico_descripcion: Optional[str] = None
+
+    class Config:
+        from_attributes = True

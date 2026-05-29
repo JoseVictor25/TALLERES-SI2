@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.models.rol_usuario import RolUsuario
 from app.models.rol import Rol
 from app.models.tecnico_especialidad import TecnicoEspecialidad
+from app.core.constants import ROL_TECNICO
 
 class CRUDEmpleado(CRUDBase[Empleado]):
     async def get_by_taller(
@@ -64,7 +65,7 @@ class CRUDEmpleado(CRUDBase[Empleado]):
         # Subconsulta para obtener ids de usuarios con rol tecnico en ese taller
         subq_usuario = select(RolUsuario.id_usuario).join(Rol).where(
             RolUsuario.id_taller == id_taller,
-            Rol.nombre == "tecnico"
+            Rol.nombre == ROL_TECNICO
         ).subquery()
 
         # Subconsulta para obtener ids de empleados que tienen especialidades (fueron técnicos)

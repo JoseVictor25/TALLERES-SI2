@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
 from app.db.session import get_db
@@ -109,6 +109,10 @@ async def _finalizar_servicio(db: AsyncSession, servicio: Servicio):
     
     # Metrica
     if ultimo_estado and ultimo_estado.estado.value == 'en_atencion':
+        tiempo = ultimo_estado.tiempo
+        if tiempo.tzinfo is None:
+            tiempo = tiempo.replace(tzinfo=timezone.utc)
+        tiempo_desde_anterior = ahora - tiempo
         result_metrica = await db.execute(
             select(Metrica).where(Metrica.id_servicio == servicio.id)
         )
@@ -116,6 +120,34 @@ async def _finalizar_servicio(db: AsyncSession, servicio: Servicio):
         if metrica:
             metrica.tiempo_resolucion = tiempo_desde_anterior
             
+    # Liberar recursos (Técnicos y Vehículos) asignados al servicio
+    # Empleados
+    from app.models.servicio_tecnico import ServicioTecnico
+    from app.models.empleado import Empleado, EstadoEmpleado
+    
+    result_tecnicos = await db.execute(
+        select(Empleado)
+        .join(ServicioTecnico, ServicioTecnico.id_empleado == Empleado.id)
+        .where(ServicioTecnico.id_servicio == servicio.id)
+    )
+    tecnicos = result_tecnicos.scalars().all()
+    for tecnico in tecnicos:
+        if tecnico.estado == EstadoEmpleado.en_servicio:
+            tecnico.estado = EstadoEmpleado.disponible
+            
+    # Vehículos
+    from app.models.servicio_vehiculo import ServicioVehiculo
+    from app.models.vehiculo_taller import VehiculoTaller, EstadoVehiculoTaller
+    
+    result_vehiculos = await db.execute(
+        select(VehiculoTaller)
+        .join(ServicioVehiculo, ServicioVehiculo.id_vehiculo_taller == VehiculoTaller.id)
+        .where(ServicioVehiculo.id_servicio == servicio.id)
+    )
+    vehiculos = result_vehiculos.scalars().all()
+    for vehiculo in vehiculos:
+        if vehiculo.estado == EstadoVehiculoTaller.en_servicio:
+            vehiculo.estado = EstadoVehiculoTaller.disponible
 
 
 # ============================================================
@@ -326,39 +358,55 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
     # Manejar eventos
     if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        
-        # Obtener el servicio asociado
-        metadata = getattr(session, 'metadata', {})
-        servicio_id_str = None
-        if hasattr(metadata, 'get'):
-            servicio_id_str = metadata.get('servicio_id')
-        else:
-            servicio_id_str = getattr(metadata, 'servicio_id', None)
+        try:
+            session = event['data']['object']
+            
+            # Extraer metadata de forma segura sin usar .get en StripeObjects
+            if isinstance(session, dict):
+                metadata = session.get('metadata', {})
+                session_id = session.get('id')
+            else:
+                metadata = getattr(session, 'metadata', {})
+                session_id = getattr(session, 'id', None)
 
-        if not servicio_id_str:
-            return {"status": "ignored", "reason": "No servicio_id in metadata"}
-            
-        servicio_id = int(servicio_id_str)
-        
-        # Actualizar factura
-        session_id = getattr(session, 'id', None)
-        result = await db.execute(
-            select(Factura).where(Factura.id_pasarela == session_id)
-        )
-        factura = result.scalar_one_or_none()
-        
-        if factura:
-            from datetime import timezone
-            factura.estado_pago = EstadoPago.pagado
-            factura.fecha_pago = datetime.now(timezone.utc)
-            
-            # Finalizar el servicio automáticamente
-            servicio = await db.get(Servicio, servicio_id)
-            if servicio:
-                await _finalizar_servicio(db, servicio)
+            if isinstance(metadata, dict):
+                servicio_id_str = metadata.get('servicio_id')
+            else:
+                servicio_id_str = getattr(metadata, 'servicio_id', None)
+
+            if not servicio_id_str:
+                print("WEBHOOK ERROR: No servicio_id in metadata")
+                return {"status": "ignored", "reason": "No servicio_id in metadata"}
                 
-            await db.commit()
-            return {"status": "success"}
+            servicio_id = int(servicio_id_str)
+            print(f"WEBHOOK SUCCESS: Procesando session_id {session_id} para servicio {servicio_id}")
+            
+            result = await db.execute(
+                select(Factura).where(Factura.id_pasarela == session_id)
+            )
+            factura = result.scalar_one_or_none()
+            
+            if factura:
+                factura.estado_pago = EstadoPago.pagado
+                factura.fecha_pago = datetime.now(timezone.utc)
+                
+                # Finalizar el servicio automáticamente
+                servicio = await db.get(Servicio, servicio_id)
+                if servicio:
+                    await _finalizar_servicio(db, servicio)
+                    
+                await db.commit()
+                print(f"WEBHOOK SUCCESS: Factura {factura.id} actualizada exitosamente")
+                return {"status": "success"}
+            else:
+                print(f"WEBHOOK ERROR: Factura no encontrada con pasarela {session_id}")
+                return {"status": "ignored", "reason": "Factura not found"}
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"WEBHOOK EXCEPTION CRITICAL: {error_details}")
+            with open("webhook_error.log", "a") as f:
+                f.write(f"\n--- WEBHOOK ERROR {datetime.now()} ---\n{error_details}\n")
+            raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
     return {"status": "ignored"}

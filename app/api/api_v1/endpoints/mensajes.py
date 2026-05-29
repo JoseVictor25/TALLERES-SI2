@@ -84,7 +84,7 @@ async def _verificar_acceso_servicio(
             and_(
                 RolUsuario.id_usuario == usuario_id,
                 RolUsuario.id_taller == servicio.id_taller,
-                Rol.nombre.in_(["administrador_taller", "tecnico"])
+                Rol.nombre.in_([ROL_ADMIN_TALLER, ROL_TECNICO])
             )
         )
     )
@@ -95,7 +95,7 @@ async def _verificar_acceso_servicio(
         )
         rol = result_rol.scalar_one_or_none()
         if rol:
-            return "admin_taller" if rol.nombre == "administrador_taller" else "tecnico"
+            return "admin_taller" if rol.nombre == ROL_ADMIN_TALLER else "tecnico"
 
     raise HTTPException(
         status_code=403,

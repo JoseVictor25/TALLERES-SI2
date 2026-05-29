@@ -18,9 +18,13 @@ from .endpoints import (
     admin_configuracion,
     taller_servicios,
     tecnico_servicios,
+    cliente_servicios,
     monitoreo,
     mensajes,
-    pagos
+    pagos,
+    admin_usuarios,
+    notifications,
+    admin_bitacora
 )
 
 api_router = APIRouter()
@@ -40,8 +44,12 @@ api_router.include_router(admin_categorias.router, prefix="/admin/categorias", t
 api_router.include_router(admin_tipos.router, prefix="/admin/tipos", tags=["Admin - Tipos Incidente"])
 api_router.include_router(vehiculos_taller.router, tags=["Vehículos Taller"])
 api_router.include_router(admin_configuracion.router, prefix="/admin/configuracion", tags=["Admin - Configuración"])
+api_router.include_router(admin_usuarios.router, prefix="/admin/usuarios", tags=["Admin - Usuarios"])
+api_router.include_router(admin_bitacora.router, prefix="/admin/sistema/bitacora", tags=["Admin - Bitácora"])
 api_router.include_router(taller_servicios.router, tags=["Taller - Gestión de Servicios"])
 api_router.include_router(tecnico_servicios.router, tags=["Técnico - Servicios Móvil"])
+api_router.include_router(cliente_servicios.router, tags=["Cliente - Seguimiento de Servicios"])
 api_router.include_router(monitoreo.router)
 api_router.include_router(mensajes.router)
 api_router.include_router(pagos.router)
+api_router.include_router(notifications.router)

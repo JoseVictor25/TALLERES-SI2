@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
@@ -11,6 +11,7 @@ class Usuario(Base):
     contrasena = Column(String(255), nullable=False)
     url_img_perfil = Column(Text, nullable=True)
     id_persona = Column(Integer, ForeignKey("persona.id", ondelete="RESTRICT"), unique=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
 
     # relaciones
     persona = relationship("Persona", back_populates="usuario")

@@ -23,13 +23,14 @@ class CRUDTaller(CRUDBase[Taller]):
         Retorna lista paginada y total de registros.
         """
         # Subconsulta para obtener ids de talleres
+        from app.core.constants import ROL_ADMIN_TALLER, ROL_SUPER_ADMIN_TALLER
         stmt = select(Taller).join(
             RolUsuario, Taller.id == RolUsuario.id_taller
         ).join(
             Rol, Rol.id == RolUsuario.id_rol
         ).where(
             RolUsuario.id_usuario == id_usuario,
-            Rol.nombre.in_(['admin_taller', 'super_admin_taller'])
+            Rol.nombre.in_([ROL_ADMIN_TALLER, ROL_SUPER_ADMIN_TALLER])
         ).distinct()
 
         # Total

@@ -1,12 +1,15 @@
 """
-Servicio para envío de notificaciones push usando Firebase Cloud Messaging (FCM)
+Servicio para envío de notificaciones push usando Firebase Admin SDK (FCM v1)
 """
 import logging
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-import httpx
 import json
+import os
+
+import firebase_admin
+from firebase_admin import credentials, messaging
 
 from app.models.dispositivo_usuario import DispositivoUsuario
 from app.models.persona import Persona
@@ -19,72 +22,67 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Initialize Firebase Admin
+try:
+    if not firebase_admin._apps:
+        # Buscamos el archivo JSON generado
+        cred_path = os.path.join(os.getcwd(), 'talleres.json')
+        if os.path.exists(cred_path):
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
+            logger.info("Firebase Admin inicializado exitosamente.")
+        else:
+            logger.warning(f"No se encontró el archivo de credenciales de Firebase en {cred_path}")
+except Exception as e:
+    logger.error(f"Error inicializando Firebase Admin: {e}")
+
 class NotificationService:
     """Servicio para gestionar notificaciones push"""
-    
-    def __init__(self):
-        # Configuración FCM (agregar a settings)
-        self.fcm_server_key = getattr(settings, 'FCM_SERVER_KEY', None)
-        self.fcm_url = "https://fcm.googleapis.com/fcm/send"
     
     async def enviar_notificacion_push(
         self,
         tokens: List[str],
         titulo: str,
         mensaje: str,
-        datos_extra: Optional[Dict[str, Any]] = None
+        datos_extra: Optional[Dict[str, str]] = None
     ) -> bool:
         """
-        Envía notificación push a una lista de tokens FCM
+        Envía notificación push a una lista de tokens FCM usando Firebase Admin
         """
-        if not self.fcm_server_key:
-            logger.warning("FCM_SERVER_KEY no configurado, no se pueden enviar notificaciones")
+        if not firebase_admin._apps:
+            logger.warning("Firebase Admin no está inicializado, no se pueden enviar notificaciones")
             return False
         
         if not tokens:
             logger.info("No hay tokens FCM para enviar notificación")
             return True
         
-        # Preparar payload FCM
-        payload = {
-            "registration_ids": tokens,
-            "notification": {
-                "title": titulo,
-                "body": mensaje,
-                "sound": "default",
-                "badge": 1
-            },
-            "data": datos_extra or {}
-        }
-        
-        headers = {
-            "Authorization": f"key={self.fcm_server_key}",
-            "Content-Type": "application/json"
-        }
+        # En FCM v1, los datos adicionales (data payload) deben ser un diccionario de strings
+        if datos_extra:
+            datos_extra = {k: str(v) for k, v in datos_extra.items()}
+            
+        message = messaging.MulticastMessage(
+            notification=messaging.Notification(
+                title=titulo,
+                body=mensaje,
+            ),
+            data=datos_extra,
+            tokens=tokens
+        )
         
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    self.fcm_url,
-                    json=payload,
-                    headers=headers
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    success_count = result.get('success', 0)
-                    failure_count = result.get('failure', 0)
-                    
-                    logger.info(f"Notificación enviada: {success_count} éxitos, {failure_count} fallos")
-                    
-                    # TODO: Manejar tokens inválidos (eliminar de BD)
-                    if failure_count > 0:
-                        logger.warning(f"Algunos tokens FCM fallaron: {result.get('results', [])}")
-                    
-                    return success_count > 0
-                else:
-                    logger.error(f"Error FCM: {response.status_code} - {response.text}")
-                    return False
+            # Enviar notificación a multiples tokens (esto es bloqueante, pero muy rápido)
+            # Idealmente se correría en un threadpool (run_in_threadpool) si es muy pesado
+            response = messaging.send_each_for_multicast(message)
+            
+            logger.info(f"Notificación enviada: {response.success_count} éxitos, {response.failure_count} fallos")
+            
+            if response.failure_count > 0:
+                for idx, resp in enumerate(response.responses):
+                    if not resp.success:
+                        logger.warning(f"Error enviando a token {tokens[idx]}: {resp.exception}")
+                        
+            return response.success_count > 0
                     
         except Exception as e:
             logger.error(f"Error enviando notificación FCM: {e}")

@@ -90,9 +90,10 @@ async def list_empleados(
         persona = await crud_persona.get(db, emp.usuario.id_persona)
         # Obtener rol en el taller
         roles = await crud_rol_usuario.get_roles_by_usuario(db, emp.id_usuario)
+        from app.core.constants import ROL_ADMIN_TALLER, ROL_SUPER_ADMIN_TALLER
         rol_nombre = None
         for r in roles:
-            if r.id_taller == id_taller and r.rol.nombre in ["admin_taller", "super_admin_taller"]:
+            if r.id_taller == id_taller and r.rol.nombre in [ROL_ADMIN_TALLER, ROL_SUPER_ADMIN_TALLER]:
                 rol_nombre = r.rol.nombre
                 break
         responses.append(EmpleadoResponse(

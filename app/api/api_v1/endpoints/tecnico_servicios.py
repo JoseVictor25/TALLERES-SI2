@@ -24,6 +24,7 @@ from app.models.historial_estado_servicio import HistorialEstadoServicio
 from app.models.metrica import Metrica
 from app.models.ubicacion_tecnico import UbicacionTecnico
 from app.crud import empleado as empleado_crud
+from app.crud import crud_empleado_ubicacion
 from geoalchemy2.shape import to_shape
 from pydantic import BaseModel
 from datetime import datetime
@@ -194,7 +195,7 @@ async def obtener_talleres_tecnico(
         .where(
             and_(
                 RolUsuario.id_usuario == current_usuario.id,
-                Rol.nombre == "tecnico"
+                Rol.nombre == ROL_TECNICO
             )
         )
     )
@@ -557,7 +558,8 @@ async def actualizar_ubicacion_tecnico(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Actualiza la ubicación GPS del técnico para seguimiento en tiempo real
+    Actualiza la ubicación GPS del técnico para seguimiento en tiempo real.
+    Escribe en EmpleadoUbicacion para que el cliente pueda leerla.
     """
     # Obtener el servicio
     servicio = await db.get(Servicio, servicio_id)
@@ -586,30 +588,15 @@ async def actualizar_ubicacion_tecnico(
             detail="Solo se puede actualizar ubicación en servicios activos"
         )
     
-    # Guardar o actualizar la ubicación del técnico para este servicio
-    result = await db.execute(
-        select(UbicacionTecnico).where(
-            and_(
-                UbicacionTecnico.id_servicio == servicio_id,
-                UbicacionTecnico.id_empleado == empleado.id
-            )
-        )
+    # Guardar ubicación usando EmpleadoUbicacion (tabla compartida con el cliente)
+    # Esto desactiva la ubicación anterior y crea una nueva activa
+    await crud_empleado_ubicacion.empleado_ubicacion.crear_ubicacion(
+        db=db,
+        id_empleado=empleado.id,
+        latitud=request.latitud,
+        longitud=request.longitud,
+        id_servicio=servicio_id
     )
-    ubicacion = result.scalar_one_or_none()
-    
-    if ubicacion:
-        ubicacion.latitud = request.latitud
-        ubicacion.longitud = request.longitud
-        ubicacion.timestamp = func.now()
-    else:
-        nueva_ubicacion = UbicacionTecnico(
-            id_servicio=servicio_id,
-            id_empleado=empleado.id,
-            latitud=request.latitud,
-            longitud=request.longitud
-        )
-        db.add(nueva_ubicacion)
-        
     await db.commit()
     
     return {

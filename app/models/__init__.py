@@ -31,4 +31,5 @@ from app.models.empleado_ubicacion import EmpleadoUbicacion
 from app.models.valoracion import Valoracion
 from app.models.mensaje import Mensaje
 from app.models.factura import Factura, EstadoPago
+from app.models.bitacora_acceso import BitacoraAcceso, AccionAcceso
 from app.models.ubicacion_tecnico import UbicacionTecnico
