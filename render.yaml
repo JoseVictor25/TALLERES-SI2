@@ -34,9 +34,9 @@ services:
         sync: false
       - key: PROJECT_NAME
         value: "Talleres API"
-        
-  - type: psql
-    name: talleres-db
+
+databases:
+  - name: talleres-db
     region: ohio
     plan: free
     databaseName: talleres
