@@ -34,6 +34,18 @@ services:
         sync: false
       - key: PROJECT_NAME
         value: "Talleres API"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: "llama-3.1-8b-instant"
+      - key: WHISPER_MODEL_SIZE
+        value: "base"
+      - key: USE_REAL_AI
+        value: "true"
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
 
 databases:
   - name: talleres-db
