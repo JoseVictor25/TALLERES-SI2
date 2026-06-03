@@ -4,8 +4,8 @@
 # SQLAlchemy asíncrono y síncrono requieren un prefijo ligeramente diferente.
 # Reemplazamos "postgres://" por "postgresql://" y "postgresql+asyncpg://" en tiempo de ejecución.
 
-export SYNC_DATABASE_URL=$(echo $RENDER_DB_URL | sed 's/^postgres:\/\//postgresql:\/\//')
-export DATABASE_URL=$(echo $RENDER_DB_URL | sed 's/^postgres:\/\//postgresql+asyncpg:\/\//')
+export SYNC_DATABASE_URL=$(python -c "import os; print(os.environ['RENDER_DB_URL'].replace('postgres://', 'postgresql://', 1))")
+export DATABASE_URL=$(python -c "import os; url=os.environ['RENDER_DB_URL'].replace('postgres://', 'postgresql://', 1); print(url.replace('postgresql://', 'postgresql+asyncpg://', 1))")
 
 echo "Ejecutando migraciones de Alembic..."
 alembic upgrade head
