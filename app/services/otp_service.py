@@ -95,20 +95,13 @@ def _send_otp_email_sync(email: str, otp: str) -> None:
     msg.attach(MIMEText(body, "html"))
 
     try:
-        # Imprimimos el OTP en los logs por si el envío falla (ej: en Render Free Tier)
-        print("\n" + "="*50)
-        print(f"ATENCIÓN: Código OTP para {email} es -> {otp} <-")
-        print("="*50 + "\n")
-        
         # Conectar al servidor SMTP
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             server.starttls()  # Habilitar TLS
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(msg)
     except Exception as e:
-        print(f"Advertencia: No se pudo enviar el email por SMTP (posible bloqueo en Render): {str(e)}")
-        # No lanzamos el error para que la app no se rompa y podamos ver el código en los logs de Render
-        pass
+        raise OTPSendError(f"No se pudo enviar el email a {email}: {str(e)}")
 
 async def send_otp_email_safe(
     email: str,
