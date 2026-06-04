@@ -577,3 +577,27 @@ async def obtener_detalle_servicio(
         tecnicos_asignados=tecnicos_response,
         vehiculos_asignados=vehiculos_response
     )
+
+from app.schemas.valoracion import ValoracionResponse
+from app.crud import crud_valoracion
+
+@router.get("/servicios/{servicio_id}/valoracion", response_model=ValoracionResponse | None)
+async def obtener_valoracion_servicio_taller(
+    servicio_id: int,
+    id_taller: int,
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene la valoración de un servicio finalizado (vista del taller).
+    """
+    servicio = await servicio_crud.get(db, servicio_id)
+    if not servicio:
+        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+    
+    if servicio.id_taller != id_taller:
+        raise HTTPException(status_code=403, detail="El servicio no pertenece a este taller")
+        
+    valoracion = await crud_valoracion.valoracion.get_by_servicio(db, servicio_id)
+    return valoracion
+
