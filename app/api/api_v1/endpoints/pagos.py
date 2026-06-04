@@ -3,6 +3,7 @@ CU-15: Gestionar Pagos
 Endpoints para generar cobros, consultar facturas y recibir webhooks de Stripe.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from pydantic import BaseModel
@@ -25,6 +26,66 @@ from app.models.metrica import Metrica
 from app.services.stripe_service import crear_sesion_checkout, verificar_webhook
 
 router = APIRouter(prefix="/pagos", tags=["Pagos"])
+
+# ============================================================
+# PÁGINAS DE RETORNO DE STRIPE
+# ============================================================
+
+@router.get("/exito", response_class=HTMLResponse)
+async def pago_exito(session_id: Optional[str] = None):
+    return """
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Pago Exitoso</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 50px; background-color: #f0fdf4; color: #166534; }
+            .container { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+            h1 { color: #15803d; margin-bottom: 10px; }
+            p { color: #4b5563; font-size: 18px; }
+            .icon { font-size: 64px; margin-bottom: 20px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="icon">✅</div>
+            <h1>¡Pago Confirmado!</h1>
+            <p>Tu pago ha sido procesado exitosamente.</p>
+            <p>Ya puedes cerrar esta ventana y regresar con el mecánico.</p>
+        </div>
+    </body>
+    </html>
+    """
+
+@router.get("/cancelado", response_class=HTMLResponse)
+async def pago_cancelado():
+    return """
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Pago Cancelado</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 50px; background-color: #fef2f2; color: #991b1b; }
+            .container { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+            h1 { color: #b91c1c; margin-bottom: 10px; }
+            p { color: #4b5563; font-size: 18px; }
+            .icon { font-size: 64px; margin-bottom: 20px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="icon">❌</div>
+            <h1>Pago Cancelado</h1>
+            <p>El proceso de pago fue cancelado o no se completó.</p>
+            <p>Puedes cerrar esta ventana e intentarlo nuevamente con el mecánico.</p>
+        </div>
+    </body>
+    </html>
+    """
 
 # ============================================================
 # SCHEMAS

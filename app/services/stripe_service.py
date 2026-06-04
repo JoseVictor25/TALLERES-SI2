@@ -34,9 +34,9 @@ def crear_sesion_checkout(
                 'quantity': 1,
             }],
             mode='payment',
-            # Redirecciones (estas URLs pueden ser manejadas por la app móvil o web)
-            success_url=f"{settings.BASE_URL}/pagos/exito?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.BASE_URL}/pagos/cancelado",
+            # Redirecciones (el backend servirá una página HTML simple para estas rutas)
+            success_url=f"{settings.BASE_URL}/api/v1/pagos/exito?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{settings.BASE_URL}/api/v1/pagos/cancelado",
             metadata={
                 "servicio_id": str(servicio_id)
             }
