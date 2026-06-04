@@ -11,5 +11,5 @@ python seed_tipos_incidente.py
 python seed_diagnostico.py
 
 echo "Iniciando servidor Uvicorn..."
-# Render provee el puerto automáticamente a través de la variable $PORT
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# Render/Railway provee el puerto automǭticamente a travǸs de la variable $PORT
+uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
