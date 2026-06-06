@@ -226,6 +226,7 @@ async def generar_cobro(
     [TÉCNICO] Genera una factura y un link de pago de Stripe para un servicio.
     El servicio debe estar 'en_atencion'.
     """
+    print(f"DEBUG: generar_cobro llamado para servicio {servicio_id} con monto {payload.monto_total}")
     servicio = await db.get(Servicio, servicio_id)
     if not servicio:
         raise HTTPException(status_code=404, detail="Servicio no encontrado")
@@ -252,11 +253,14 @@ async def generar_cobro(
     liquido = monto - comision
     
     # Llamar a Stripe
-    stripe_session = crear_sesion_checkout(
-        servicio_id=servicio_id,
-        monto_total=float(monto),
-        descripcion=f"Asistencia Vial - Servicio #{servicio_id}"
-    )
+    try:
+        stripe_session = crear_sesion_checkout(
+            servicio_id=servicio_id,
+            monto_total=float(monto),
+            descripcion=f"Asistencia Vial - Servicio #{servicio_id}"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     
     if factura_existente:
         # Actualizar existente
