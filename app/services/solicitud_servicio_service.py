@@ -92,7 +92,6 @@ async def obtener_especialidades_requeridas(
     
     return especialidad_ids
 
-
 async def buscar_talleres_cercanos_con_especialidades(
     db: AsyncSession,
     ubicacion_cliente: tuple[float, float],  # (lat, lon)
@@ -138,13 +137,8 @@ async def buscar_talleres_cercanos_con_especialidades(
     talleres_validos = []
     
     for taller, distancia in talleres_cercanos:
-        # Si no hay especialidades requeridas, agregar el taller directamente
+        # Si no hay especialidades requeridas, no devolvemos talleres irrelevantes
         if not especialidades_requeridas:
-            talleres_validos.append({
-                'taller': taller,
-                'distancia_km': round(distancia / 1000, 2),
-                'especialidades_disponibles': []
-            })
             continue
 
         # Verificar que el taller tenga técnicos con al menos una especialidad requerida

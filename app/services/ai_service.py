@@ -266,16 +266,25 @@ Genera ÚNICAMENTE un JSON válido con esta estructura:
     "descripcion": "texto explicativo en español del diagnóstico",
     "nivel_confianza": 0.85,
     "incidentes": [
-        {"concepto": "nombre_exacto_de_la_lista", "nivel_confianza": 0.9, "sugerido_por": "ia"},
-        {"concepto": "otro_concepto_de_la_lista", "nivel_confianza": 0.8, "sugerido_por": "ia"}
+        {"concepto": "nombre_exacto_de_la_lista", "nivel_confianza": 0.9, "sugerido_por": "ia"}
     ]
 }
 
 REGLAS IMPORTANTES:
-- Los conceptos DEBEN estar EXACTAMENTE en la lista de conceptos válidos
-- nivel_confianza general es el promedio de los niveles de los incidentes
-- No incluyas texto fuera del JSON
-- Si falta información, usa "informacion_insuficiente" (debe estar en la lista)
+- Los conceptos DEBEN estar EXACTAMENTE en la lista de conceptos válidos.
+- nivel_confianza general es el promedio de los niveles de los incidentes.
+- No incluyas texto fuera del JSON.
+- REGLA DE ORO: Si el problema descrito por el usuario NO corresponde a ninguno de los conceptos en tu lista (ej. caja de cambios, aire acondicionado, llantas, etc.), debes devolver [{"concepto": "Problema no identificado", "nivel_confianza": 0.0, "sugerido_por": "ia"}]. SIN EMBARGO, si el usuario menciona un componente directamente relacionado con uno de tus conceptos (por ejemplo, "radiador" está ligado a "Motor sobrecalentado", "bujías" a "Motor no enciende"), puedes y DEBES deducir el concepto correspondiente.
+
+### EJEMPLOS DE COMPORTAMIENTO ESPERADO ###
+Usuario: "El auto no frena bien."
+Tu respuesta: {"descripcion": "El usuario reporta fallas en el frenado...", "nivel_confianza": 0.9, "incidentes": [{"concepto": "Frenos sin respuesta", "nivel_confianza": 0.9, "sugerido_por": "ia"}]}
+
+Usuario: "La caja de cambios raspa al meter segunda."
+Tu respuesta: {"descripcion": "El usuario reporta problemas en la transmisión. No hay especialidad disponible para este problema.", "nivel_confianza": 0.0, "incidentes": [{"concepto": "Problema no identificado", "nivel_confianza": 0.0, "sugerido_por": "ia"}]}
+
+Usuario: "no se que pasa"
+Tu respuesta: {"descripcion": "El usuario no proporcionó detalles sobre el problema.", "nivel_confianza": 0.0, "incidentes": [{"concepto": "Problema no identificado", "nivel_confianza": 0.0, "sugerido_por": "ia"}]}
 
 ### RESPUESTA (SOLO JSON): ###
 """

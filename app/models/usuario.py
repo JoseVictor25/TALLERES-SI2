@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
+from app.models.tenant import Tenant
 
 class Usuario(Base):
     __tablename__ = "usuario"
@@ -12,7 +13,9 @@ class Usuario(Base):
     url_img_perfil = Column(Text, nullable=True)
     id_persona = Column(Integer, ForeignKey("persona.id", ondelete="RESTRICT"), unique=True, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenant.id", ondelete="CASCADE"), nullable=True)
 
     # relaciones
     persona = relationship("Persona", back_populates="usuario")
     roles = relationship("RolUsuario", back_populates="usuario")
+    tenant = relationship("Tenant", back_populates="usuarios")

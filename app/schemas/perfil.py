@@ -13,6 +13,7 @@ class UpdatePerfilRequest(BaseModel):
     direccion: Optional[str] = None
 
 class PerfilResponse(BaseModel):
+    id_usuario: Optional[int] = None
     email: EmailStr
     username: Optional[str] = None
     url_img_perfil: Optional[str] = None
@@ -24,6 +25,7 @@ class PerfilResponse(BaseModel):
     telefono: Optional[str] = None
     direccion: Optional[str] = None
     roles: List[str] = []  # Lista de roles del usuario
+    tenant_id: Optional[int] = None
 
 class CreateUsuarioRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)

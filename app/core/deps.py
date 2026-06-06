@@ -48,6 +48,13 @@ async def get_current_usuario(
         raise HTTPException(status_code=403, detail="User account required")
     return usuario
 
+async def get_current_tenant_id(
+    current_usuario: Usuario = Depends(get_current_usuario)
+) -> int:
+    if not current_usuario.tenant_id:
+        raise HTTPException(status_code=403, detail="El usuario no pertenece a ningún tenant")
+    return current_usuario.tenant_id
+
 # ========== DEPENDENCIAS DE AUTORIZACIÓN (permisos) ==========
 
 # Dependencia para verificar si el usuario autenticado tiene el permiso especificado

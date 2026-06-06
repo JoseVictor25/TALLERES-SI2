@@ -132,3 +132,51 @@ async def complete_web_registration(db: AsyncSession, email: str, code: str) -> 
     await db.commit()
     logger.info(f"Nuevo usuario web registrado: {user_data['email']}")
     return TokenResponse(access_token=access_token)
+
+async def direct_web_registration(db: AsyncSession, data: dict) -> TokenResponse:
+    """
+    Registro web directo sin verificación OTP (usado para flujo de Taller).
+    """
+    email = data["email"]
+    username = data.get("username", email.split('@')[0])
+    
+    # Verificar email
+    existing_persona = await crud_persona.get_by_email(db, email)
+    if existing_persona:
+        usuario = await crud_usuario.get_by_id_persona(db, existing_persona.id)
+        if usuario:
+            raise EmailAlreadyRegisteredError()
+            
+    # Verificar username
+    existing_user = await crud_usuario.get_by_nombre(db, username)
+    if existing_user:
+        raise UsernameTakenError()
+
+    persona_extra = {k: v for k, v in data.items() if k not in ["email", "username", "password", "taller_name"]}
+
+    if existing_persona:
+        persona = existing_persona
+        if persona_extra:
+            persona = await update_persona_data(db, persona, persona_extra)
+    else:
+        persona = await create_persona(db, email, persona_extra)
+
+    # Crear usuario
+    nuevo_usuario = await create_usuario_from_persona(db, persona, username, data["password"])
+
+    # Asignar rol 'cliente' por defecto (luego al pagar se le da Administrador de Taller)
+    rol = await crud_rol.get_by_nombre(db, ROL_CLIENTE)
+    if not rol:
+        from app.models.rol import Rol
+        rol = Rol(nombre=ROL_CLIENTE, descripcion="Rol de cliente creado automáticamente")
+        db.add(rol)
+        await db.commit()
+        await db.refresh(rol)
+
+    await crud_rol_usuario.add_rol(db, nuevo_usuario.id, rol.id)
+
+    await db.commit()
+    access_token = await create_token_and_session(db, email)
+    await db.commit()
+    logger.info(f"Nuevo Taller Admin web registrado directamente: {email}")
+    return TokenResponse(access_token=access_token)

@@ -14,6 +14,7 @@ class SugeridoPorTipo(str, enum.Enum):
 
 class EstadoSolicitudServicio(str, enum.Enum):
     pendiente = "pendiente"
+    cotizada = "cotizada"
     aceptada = "aceptada"
     rechazada = "rechazada"
     cancelada = "cancelada"

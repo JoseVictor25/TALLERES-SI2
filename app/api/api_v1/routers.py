@@ -24,7 +24,8 @@ from .endpoints import (
     pagos,
     admin_usuarios,
     notifications,
-    admin_bitacora
+    admin_bitacora,
+    tenants
 )
 
 api_router = APIRouter()
@@ -53,3 +54,4 @@ api_router.include_router(monitoreo.router)
 api_router.include_router(mensajes.router)
 api_router.include_router(pagos.router)
 api_router.include_router(notifications.router)
+api_router.include_router(tenants.router)

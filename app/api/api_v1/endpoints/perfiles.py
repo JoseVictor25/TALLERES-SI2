@@ -32,6 +32,7 @@ async def get_my_profile(
         roles = [row[0] for row in result.all()]
     
     return PerfilResponse(
+        id_usuario=usuario.id if usuario else None,
         email=current_persona.email,
         username=usuario.nombre if usuario else None,
         url_img_perfil=usuario.url_img_perfil if usuario else None,
@@ -43,6 +44,7 @@ async def get_my_profile(
         telefono=current_persona.telefono,
         direccion=current_persona.direccion,
         roles=roles,  # Enviar lista de roles
+        tenant_id=usuario.tenant_id if usuario else None,
     )
 
 @router.put("/me", response_model=PerfilResponse)
@@ -80,6 +82,7 @@ async def update_my_profile(
         roles = [row[0] for row in result_rol.all()]
     
     return PerfilResponse(
+        id_usuario=usuario.id if usuario else None,
         email=persona.email,
         username=usuario.nombre if usuario else None,
         url_img_perfil=usuario.url_img_perfil if usuario else None,
@@ -91,6 +94,7 @@ async def update_my_profile(
         telefono=persona.telefono,
         direccion=persona.direccion,
         roles=roles,
+        tenant_id=usuario.tenant_id if usuario else None,
     )
 
 @router.post("/create-usuario", response_model=PerfilResponse, status_code=status.HTTP_201_CREATED)
@@ -124,6 +128,7 @@ async def create_usuario(
         roles = [row[0] for row in result_rol.all()]
     
     return PerfilResponse(
+        id_usuario=usuario.id if usuario else None,
         email=persona.email,
         username=usuario.nombre if usuario else None,
         url_img_perfil=usuario.url_img_perfil if usuario else None,
@@ -135,6 +140,7 @@ async def create_usuario(
         telefono=persona.telefono,
         direccion=persona.direccion,
         roles=roles,
+        tenant_id=usuario.tenant_id if usuario else None,
     )
 
 @router.post("/upload-photo")

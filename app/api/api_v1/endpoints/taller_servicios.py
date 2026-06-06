@@ -21,7 +21,8 @@ from app.schemas.servicio import (
     VehiculoClienteResponse,
     DiagnosticoDetalleResponse,
     TecnicoAsignadoResponse,
-    VehiculoAsignadoResponse
+    VehiculoAsignadoResponse,
+    CotizacionCreate
 )
 from app.services import servicio_service
 from app.crud import (
@@ -248,8 +249,31 @@ async def listar_vehiculos_disponibles(
     ]
 
 
-@router.post("/solicitudes/{solicitud_id}/aceptar", response_model=ServicioResponse, status_code=status.HTTP_201_CREATED)
-async def aceptar_solicitud(
+@router.post("/solicitudes/{solicitud_id}/cotizar", response_model=SolicitudServicioDetalleResponse)
+async def cotizar_solicitud(
+    solicitud_id: int,
+    id_taller: int,
+    cotizacion_data: CotizacionCreate,
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    El taller cotiza la solicitud enviando un costo estimado.
+    """
+    try:
+        solicitud = await servicio_service.cotizar_solicitud_servicio(
+            db=db,
+            id_solicitud=solicitud_id,
+            id_taller=id_taller,
+            costo_estimado=cotizacion_data.costo_estimado
+        )
+        return await obtener_detalle_solicitud(solicitud_id, id_taller, current_usuario, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/solicitudes/{solicitud_id}/iniciar", response_model=ServicioResponse, status_code=status.HTTP_201_CREATED)
+async def iniciar_servicio_asignando_recursos(
     solicitud_id: int,
     id_taller: int,
     servicio_data: ServicioCreate,
@@ -262,7 +286,7 @@ async def aceptar_solicitud(
     """
     
     try:
-        servicio = await servicio_service.aceptar_solicitud_servicio(
+        servicio = await servicio_service.asignar_recursos_e_iniciar_servicio(
             db=db,
             id_solicitud=solicitud_id,
             id_taller=id_taller,
@@ -576,6 +600,97 @@ async def obtener_detalle_servicio(
         id_solicitud_servicio=servicio.id_solicitud_servicio,
         tecnicos_asignados=tecnicos_response,
         vehiculos_asignados=vehiculos_response
+    )
+
+def get_estado_descripcion(estado: str) -> str:
+    """Retorna la descripción en español del estado"""
+    map_estados = {
+        'creado': 'Creado',
+        'tecnico_asignado': 'Técnico Asignado',
+        'en_camino': 'En Camino',
+        'en_lugar': 'En el Lugar',
+        'en_atencion': 'En Atención',
+        'finalizado': 'Finalizado',
+        'cancelado': 'Cancelado'
+    }
+    return map_estados.get(estado, estado)
+
+from app.models.historial_estado_servicio import HistorialEstadoServicio
+from app.schemas.servicio import EstadoHistorialResponse, MetricaServicioResponse
+
+@router.get("/servicios/{servicio_id}/historial", response_model=List[EstadoHistorialResponse])
+async def obtener_historial_servicio_taller(
+    servicio_id: int,
+    id_taller: int,
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene el historial de estados de un servicio (vista del taller).
+    """
+    servicio = await servicio_crud.get(db, servicio_id)
+    if not servicio:
+        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+    
+    if servicio.id_taller != id_taller:
+        raise HTTPException(status_code=403, detail="El servicio no pertenece a este taller")
+        
+    from sqlalchemy import select
+    result = await db.execute(
+        select(HistorialEstadoServicio).where(
+            HistorialEstadoServicio.id_servicio == servicio_id
+        ).order_by(HistorialEstadoServicio.tiempo.asc())
+    )
+    historial = result.scalars().all()
+    
+    return [
+        EstadoHistorialResponse(
+            estado=h.estado.value,
+            estado_descripcion=get_estado_descripcion(h.estado.value),
+            tiempo=h.tiempo
+        )
+        for h in historial
+    ]
+
+
+@router.get("/servicios/{servicio_id}/metricas", response_model=MetricaServicioResponse)
+async def obtener_metricas_servicio_taller(
+    servicio_id: int,
+    id_taller: int,
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene las métricas de tiempo de un servicio (vista del taller).
+    """
+    servicio = await servicio_crud.get(db, servicio_id)
+    if not servicio:
+        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+    
+    if servicio.id_taller != id_taller:
+        raise HTTPException(status_code=403, detail="El servicio no pertenece a este taller")
+        
+    metricas = await servicio_service.calcular_metricas_servicio(db, servicio_id)
+    
+    # Formatear a MetricaServicioResponse
+    def format_td(td):
+        if not td: return None
+        total_segundos = int(td.total_seconds())
+        horas = total_segundos // 3600
+        minutos = (total_segundos % 3600) // 60
+        if horas > 0:
+            return f"{horas}h {minutos}m"
+        return f"{minutos}m"
+        
+    return MetricaServicioResponse(
+        tiempo_respuesta=format_td(metricas.get('tiempo_respuesta')),
+        tiempo_respuesta_segundos=int(metricas.get('tiempo_respuesta').total_seconds()) if metricas.get('tiempo_respuesta') else None,
+        tiempo_llegada=format_td(metricas.get('tiempo_llegada')),
+        tiempo_llegada_segundos=int(metricas.get('tiempo_llegada').total_seconds()) if metricas.get('tiempo_llegada') else None,
+        tiempo_resolucion=format_td(metricas.get('tiempo_resolucion')),
+        tiempo_resolucion_segundos=int(metricas.get('tiempo_resolucion').total_seconds()) if metricas.get('tiempo_resolucion') else None,
+        tiempo_total=format_td(metricas.get('tiempo_total')),
+        tiempo_total_segundos=int(metricas.get('tiempo_total').total_seconds()) if metricas.get('tiempo_total') else None,
     )
 
 from app.schemas.valoracion import ValoracionResponse

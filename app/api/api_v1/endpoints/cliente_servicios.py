@@ -27,7 +27,8 @@ from app.schemas.servicio import (
 )
 from app.schemas.valoracion import ValoracionCreate, ValoracionResponse
 from app.crud import crud_valoracion
-from app.services import valoracion_service
+from app.services import valoracion_service, servicio_service
+from app.schemas.servicio import SolicitudServicioListResponse
 from geoalchemy2.shape import to_shape
 from datetime import datetime
 
@@ -46,6 +47,66 @@ def get_estado_descripcion(estado: str) -> str:
         'cancelado': 'Cancelado'
     }
     return map_estados.get(estado, estado)
+
+
+@router.post("/solicitudes/{solicitud_id}/aceptar-cotizacion", status_code=status.HTTP_200_OK)
+async def aceptar_cotizacion(
+    solicitud_id: int,
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    El cliente acepta la cotización de un taller.
+    """
+    try:
+        solicitud = await servicio_service.aceptar_cotizacion_cliente(
+            db=db,
+            id_solicitud=solicitud_id,
+            id_persona_cliente=current_usuario.id_persona
+        )
+        return {"message": "Cotización aceptada", "estado": solicitud.estado.value}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/solicitudes/{solicitud_id}/rechazar-cotizacion", status_code=status.HTTP_200_OK)
+async def rechazar_cotizacion(
+    solicitud_id: int,
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    El cliente rechaza la cotización de un taller.
+    """
+    try:
+        solicitud = await servicio_service.rechazar_cotizacion_cliente(
+            db=db,
+            id_solicitud=solicitud_id,
+            id_persona_cliente=current_usuario.id_persona
+        )
+        return {"message": "Cotización rechazada", "estado": solicitud.estado.value}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/servicios/{servicio_id}/cancelar", status_code=status.HTTP_200_OK)
+async def cancelar_servicio(
+    servicio_id: int,
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    El cliente cancela un servicio en curso, liberando los recursos del taller.
+    """
+    try:
+        servicio = await servicio_service.cancelar_servicio_cliente(
+            db=db,
+            id_servicio=servicio_id,
+            id_persona_cliente=current_usuario.id_persona
+        )
+        return {"message": "Servicio cancelado", "estado": servicio.estado.value}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/servicio-actual", response_model=Optional[ServicioSeguimientoClienteResponse])

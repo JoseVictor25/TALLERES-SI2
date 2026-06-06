@@ -4,6 +4,7 @@ from geoalchemy2 import Geography
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 import enum
+from app.models.tenant import Tenant  # Import for type hint or reference if needed
 
 class EstadoTaller(str, enum.Enum):
     activo = "activo"
@@ -24,11 +25,13 @@ class Taller(Base):
     puntos = Column(DECIMAL(3,2), nullable=False, default=0.00)
     estado = Column(Enum(EstadoTaller), nullable=False, default=EstadoTaller.activo)
     id_solicitud_afiliacion = Column(Integer, ForeignKey("solicitud_afiliacion.id", ondelete="RESTRICT"), nullable=False, unique=True)
+    tenant_id = Column(Integer, ForeignKey("tenant.id", ondelete="CASCADE"), nullable=False)
 
     # Relaciones
     solicitud = relationship("SolicitudAfiliacion", back_populates="taller")
     solicitudes_servicio = relationship("SolicitudServicio", back_populates="taller")
     servicios = relationship("Servicio", back_populates="taller")
+    tenant = relationship("Tenant", back_populates="talleres")
 
     # restricciones
     __table_args__ = (

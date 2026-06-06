@@ -6,7 +6,6 @@ from sqlalchemy import select
 
 ROLES = [
     {"nombre": "cliente", "descripcion": "Cliente / Conductor"},
-    {"nombre": "conductor", "descripcion": "Cliente / Conductor"},
     {"nombre": "Mecanico", "descripcion": "Técnico del taller"},
     {"nombre": "Administrador del Taller", "descripcion": "Dueño o Administrador de un Taller"},
     {"nombre": "Administrador del Sistema", "descripcion": "Administrador global de la plataforma"}

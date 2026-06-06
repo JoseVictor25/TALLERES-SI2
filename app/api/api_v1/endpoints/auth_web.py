@@ -43,3 +43,17 @@ async def register_init(req: RegisterInitRequest, db: AsyncSession = Depends(get
 @router.post("/register/complete", response_model=TokenResponse)
 async def register_complete(req: RegisterCompleteRequest, db: AsyncSession = Depends(get_db)):
     return await registration_service.complete_web_registration(db, req.email, req.code)
+
+from pydantic import BaseModel
+class DirectRegisterRequest(BaseModel):
+    email: str
+    password: str
+    username: str = None
+    # Otros campos opcionales si los hay
+
+@router.post("/register/direct", response_model=TokenResponse)
+async def register_direct(req: DirectRegisterRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Registro directo (bypass OTP) usado para el flujo de SaaS Taller.
+    """
+    return await registration_service.direct_web_registration(db, req.dict())

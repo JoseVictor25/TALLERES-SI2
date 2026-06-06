@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -139,11 +139,16 @@ class SolicitudServicioListResponse(BaseModel):
     estado: str
     sugerido_por: str
     distancia_km: Optional[float] = None
+    costo_estimado: Optional[float] = None
     comentario: Optional[str] = None
     tiene_servicio: bool = False
     
     class Config:
         from_attributes = True
+
+
+class CotizacionCreate(BaseModel):
+    costo_estimado: float = Field(..., gt=0, description="El costo estimado de la reparación/auxilio")
 
 
 # ============================================================
@@ -247,9 +252,34 @@ class ServicioSeguimientoClienteResponse(BaseModel):
 
     # Ubicación del cliente (de la solicitud original) "lat,lon"
     ubicacion_cliente: Optional[str] = None
-
-    # Descripción del diagnóstico
+    
+    # Descripción del problema/diagnóstico original
     diagnostico_descripcion: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class EstadoHistorialResponse(BaseModel):
+    """Un estado en el historial de un servicio para el taller"""
+    estado: str
+    estado_descripcion: str
+    tiempo: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MetricaServicioResponse(BaseModel):
+    """Métricas de tiempo de un servicio"""
+    tiempo_respuesta: Optional[str] = None
+    tiempo_respuesta_segundos: Optional[int] = None
+    tiempo_llegada: Optional[str] = None
+    tiempo_llegada_segundos: Optional[int] = None
+    tiempo_resolucion: Optional[str] = None
+    tiempo_resolucion_segundos: Optional[int] = None
+    tiempo_total: Optional[str] = None
+    tiempo_total_segundos: Optional[int] = None
 
     class Config:
         from_attributes = True

@@ -43,7 +43,12 @@ async def obtener_solicitudes_recientes(
         select(SolicitudServicio).where(
             and_(
                 SolicitudServicio.id_taller == id_taller,
-                SolicitudServicio.estado == EstadoSolicitudServicio.pendiente,
+                SolicitudServicio.estado.in_([
+                    EstadoSolicitudServicio.pendiente,
+                    EstadoSolicitudServicio.cotizada,
+                    EstadoSolicitudServicio.aceptada,
+                    EstadoSolicitudServicio.rechazada
+                ]),
                 SolicitudServicio.fecha >= tiempo_limite
             )
         ).order_by(SolicitudServicio.fecha.desc())
@@ -140,7 +145,34 @@ async def obtener_vehiculos_disponibles(
     return list(result.scalars().all())
 
 
-async def aceptar_solicitud_servicio(
+async def cotizar_solicitud_servicio(
+    db: AsyncSession,
+    id_solicitud: int,
+    id_taller: int,
+    costo_estimado: float
+) -> SolicitudServicio:
+    """
+    El taller cotiza la solicitud enviando un precio estimado.
+    """
+    solicitud = await solicitud_servicio_crud.get(db, id_solicitud)
+    if not solicitud:
+        raise ValueError("Solicitud no encontrada")
+    
+    if solicitud.id_taller != id_taller:
+        raise ValueError("La solicitud no pertenece a este taller")
+    
+    if solicitud.estado not in [EstadoSolicitudServicio.pendiente, EstadoSolicitudServicio.rechazada]:
+        raise ValueError("Solo se pueden cotizar solicitudes en estado pendiente o rechazada")
+    
+    solicitud.costo_estimado = costo_estimado
+    solicitud.estado = EstadoSolicitudServicio.cotizada
+    
+    await db.commit()
+    await db.refresh(solicitud)
+    return solicitud
+
+
+async def asignar_recursos_e_iniciar_servicio(
     db: AsyncSession,
     id_solicitud: int,
     id_taller: int,
@@ -159,8 +191,8 @@ async def aceptar_solicitud_servicio(
     if solicitud.id_taller != id_taller:
         raise ValueError("La solicitud no pertenece a este taller")
     
-    if solicitud.estado != EstadoSolicitudServicio.pendiente:
-        raise ValueError("Solo se pueden aceptar solicitudes en estado pendiente")
+    if solicitud.estado not in [EstadoSolicitudServicio.aceptada, EstadoSolicitudServicio.pendiente]:
+        raise ValueError("La solicitud debe estar en estado pendiente o aceptada para iniciar el servicio")
     
     # Verificar que no exista ya un servicio para esta solicitud
     servicio_existente = await servicio_crud.get_by_solicitud(db, id_solicitud)
@@ -171,8 +203,7 @@ async def aceptar_solicitud_servicio(
     if not tecnicos_ids:
         raise ValueError("Debe asignar al menos un técnico")
     
-    if not vehiculos_ids:
-        raise ValueError("Debe asignar al menos un vehículo")
+    # Vehículos son opcionales, no se lanza error si está vacío
     
     # Crear el servicio
     servicio_data = {
@@ -226,14 +257,9 @@ async def aceptar_solicitud_servicio(
         # Cambiar estado del vehículo a en_servicio
         vehiculo.estado = EstadoVehiculoTaller.en_servicio
     
-    # Actualizar estado de la solicitud a aceptada
-    await solicitud_servicio_crud.update_estado(
-        db, 
-        id_solicitud, 
-        EstadoSolicitudServicio.aceptada
-    )
-    
     # CANCELAR TODAS LAS DEMÁS SOLICITUDES DEL MISMO DIAGNÓSTICO
+    # NOTA: Esto también podría hacerse cuando el cliente acepta la cotización.
+    # Pero lo mantenemos aquí por seguridad.
     # Obtener el id_diagnostico de la solicitud aceptada
     id_diagnostico = solicitud.id_diagnostico
     
@@ -331,4 +357,145 @@ async def completar_servicio(
     await db.commit()
     await db.refresh(servicio)
     
+    return servicio
+
+
+async def aceptar_cotizacion_cliente(
+    db: AsyncSession,
+    id_solicitud: int,
+    id_persona_cliente: int
+) -> SolicitudServicio:
+    """
+    El cliente acepta la cotización del taller.
+    """
+    from app.models.diagnostico import Diagnostico
+    from app.models.solicitud_diagnostico import SolicitudDiagnostico
+    
+    result = await db.execute(
+        select(SolicitudServicio).join(
+            Diagnostico, SolicitudServicio.id_diagnostico == Diagnostico.id
+        ).join(
+            SolicitudDiagnostico, Diagnostico.id_solicitud_diagnostico == SolicitudDiagnostico.id
+        ).where(
+            and_(
+                SolicitudServicio.id == id_solicitud,
+                SolicitudDiagnostico.id_persona == id_persona_cliente
+            )
+        )
+    )
+    solicitud = result.scalar_one_or_none()
+    
+    if not solicitud:
+        raise ValueError("Solicitud no encontrada o no autorizada")
+        
+    if solicitud.estado != EstadoSolicitudServicio.cotizada:
+        raise ValueError("La solicitud no tiene una cotización pendiente")
+        
+    solicitud.estado = EstadoSolicitudServicio.aceptada
+    solicitud.fecha_aceptada = datetime.utcnow()
+    
+    await db.commit()
+    await db.refresh(solicitud)
+    return solicitud
+
+
+async def rechazar_cotizacion_cliente(
+    db: AsyncSession,
+    id_solicitud: int,
+    id_persona_cliente: int
+) -> SolicitudServicio:
+    """
+    El cliente rechaza la cotización del taller.
+    """
+    from app.models.diagnostico import Diagnostico
+    from app.models.solicitud_diagnostico import SolicitudDiagnostico
+    
+    result = await db.execute(
+        select(SolicitudServicio).join(
+            Diagnostico, SolicitudServicio.id_diagnostico == Diagnostico.id
+        ).join(
+            SolicitudDiagnostico, Diagnostico.id_solicitud_diagnostico == SolicitudDiagnostico.id
+        ).where(
+            and_(
+                SolicitudServicio.id == id_solicitud,
+                SolicitudDiagnostico.id_persona == id_persona_cliente
+            )
+        )
+    )
+    solicitud = result.scalar_one_or_none()
+    
+    if not solicitud:
+        raise ValueError("Solicitud no encontrada o no autorizada")
+        
+    if solicitud.estado != EstadoSolicitudServicio.cotizada:
+        raise ValueError("La solicitud no está en estado cotizada")
+        
+    solicitud.estado = EstadoSolicitudServicio.rechazada
+    
+    await db.commit()
+    await db.refresh(solicitud)
+    return solicitud
+
+
+async def cancelar_servicio_cliente(
+    db: AsyncSession,
+    id_servicio: int,
+    id_persona_cliente: int
+) -> Servicio:
+    """
+    El cliente cancela un servicio en curso.
+    Libera recursos del taller.
+    """
+    from app.models.diagnostico import Diagnostico
+    from app.models.solicitud_diagnostico import SolicitudDiagnostico
+    
+    result = await db.execute(
+        select(Servicio).join(
+            SolicitudServicio, Servicio.id_solicitud_servicio == SolicitudServicio.id
+        ).join(
+            Diagnostico, SolicitudServicio.id_diagnostico == Diagnostico.id
+        ).join(
+            SolicitudDiagnostico, Diagnostico.id_solicitud_diagnostico == SolicitudDiagnostico.id
+        ).where(
+            and_(
+                Servicio.id == id_servicio,
+                SolicitudDiagnostico.id_persona == id_persona_cliente
+            )
+        )
+    )
+    servicio = result.scalar_one_or_none()
+    
+    if not servicio:
+        raise ValueError("Servicio no encontrado o no autorizado")
+        
+    if servicio.estado in [EstadoServicio.finalizado, EstadoServicio.cancelado]:
+        raise ValueError("El servicio ya fue finalizado o cancelado")
+        
+    # Liberar técnicos
+    tecnicos_asignados = await servicio_tecnico_crud.get_by_servicio(db, id_servicio)
+    for asignacion in tecnicos_asignados:
+        empleado = await empleado_crud.get(db, asignacion.id_empleado)
+        if empleado:
+            empleado.estado = EstadoEmpleado.disponible
+            
+    # Liberar vehículos
+    vehiculos_asignados = await servicio_vehiculo_crud.get_by_servicio(db, id_servicio)
+    for asignacion in vehiculos_asignados:
+        result_v = await db.execute(
+            select(VehiculoTaller).where(VehiculoTaller.id == asignacion.id_vehiculo_taller)
+        )
+        vehiculo = result_v.scalar_one_or_none()
+        if vehiculo:
+            vehiculo.estado = EstadoVehiculoTaller.disponible
+            
+    # Marcar servicio y solicitud como cancelados
+    servicio.estado = EstadoServicio.cancelado
+    
+    if servicio.id_solicitud_servicio:
+        solicitud = await solicitud_servicio_crud.get(db, servicio.id_solicitud_servicio)
+        if solicitud:
+            solicitud.estado = EstadoSolicitudServicio.cancelada
+            
+    await db.commit()
+    await db.refresh(servicio)
     return servicio

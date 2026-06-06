@@ -8,6 +8,7 @@ from app.crud.crud_persona import persona as crud_persona
 from app.crud.crud_empleado import empleado as crud_empleado
 from app.crud.crud_usuario import usuario as crud_usuario
 from app.crud.crud_rol import rol as crud_rol
+from app.crud.crud_taller import taller as crud_taller
 from app.crud.crud_rol_usuario import rol_usuario as crud_rol_usuario
 from app.crud.crud_tecnico_especialidad import tecnico_especialidad
 from app.crud.crud_especialidad import especialidad as crud_especialidad
@@ -50,13 +51,17 @@ async def create_tecnico(
     }
     nuevo_empleado = await crud_empleado.create(db, empleado_data)  # solo flush
 
-    # 5. Asignar rol 'tecnico'
+    # 5. Asignar rol 'tecnico' y actualizar tenant_id
     rol_tecnico = await crud_rol.get_by_nombre(db, ROL_TECNICO)
     if not rol_tecnico:
         raise HTTPException(500, "Rol 'tecnico' no encontrado")
     has_rol = await crud_rol_usuario.user_has_rol(db, usuario.id, rol_tecnico.id, taller_id)
     if not has_rol:
         await crud_rol_usuario.add_rol(db, usuario.id, rol_tecnico.id, taller_id)
+        
+    taller_obj = await crud_taller.get(db, taller_id)
+    if taller_obj and taller_obj.tenant_id:
+        usuario.tenant_id = taller_obj.tenant_id
 
     # 6. Asignar especialidades
     for esp_id in data.especialidades_ids:

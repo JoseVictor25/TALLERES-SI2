@@ -122,6 +122,8 @@ async def listar_talleres_sugeridos(
             'distancia_km': taller_info['distancia_km'],
             'tiene_solicitud': tiene_solicitud,
             'solicitud_id': solicitudes_map[taller.id].id if tiene_solicitud else None,
+            'estado_solicitud': str(solicitudes_map[taller.id].estado.value) if tiene_solicitud else None,
+            'costo_estimado': float(solicitudes_map[taller.id].costo_estimado) if tiene_solicitud and solicitudes_map[taller.id].costo_estimado is not None else None,
             'especialidades_disponibles': taller_info['especialidades_disponibles']
         })
     

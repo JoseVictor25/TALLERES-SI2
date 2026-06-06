@@ -332,7 +332,7 @@ async def obtener_servicios_asignados(
             estado=servicio.estado.value,
             estado_descripcion=get_estado_descripcion(servicio.estado.value),
             cliente=ClienteServicioInfo(
-                nombre=persona.nombre,
+                nombre=persona.nombre or "Desconocido",
                 telefono=persona.telefono,
                 ubicacion_lat=ubicacion_cliente[0] if ubicacion_cliente else 0.0,
                 ubicacion_lon=ubicacion_cliente[1] if ubicacion_cliente else 0.0
@@ -430,7 +430,7 @@ async def obtener_historial_servicios_tecnico(
             estado=servicio.estado.value,
             estado_descripcion=get_estado_descripcion(servicio.estado.value),
             cliente=ClienteServicioInfo(
-                nombre=persona.nombre,
+                nombre=persona.nombre or "Desconocido",
                 telefono=persona.telefono,
                 ubicacion_lat=ubicacion_cliente[0] if ubicacion_cliente else 0.0,
                 ubicacion_lon=ubicacion_cliente[1] if ubicacion_cliente else 0.0

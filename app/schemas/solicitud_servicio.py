@@ -48,4 +48,6 @@ class TallerSugeridoResponse(BaseModel):
     distancia_km: float
     tiene_solicitud: bool
     solicitud_id: Optional[int] = None
+    estado_solicitud: Optional[str] = None
+    costo_estimado: Optional[Decimal] = None
     especialidades_disponibles: list[str] = []
