@@ -31,8 +31,8 @@ from app.models.incidente import Incidente
 
 logger = logging.getLogger(__name__)
 
-# Distancia máxima por defecto en kilómetros
-DEFAULT_MAX_DISTANCE_KM = 50.0
+# Distancia máxima por defecto en kilómetros (reducida para que sean realmente talleres cercanos)
+DEFAULT_MAX_DISTANCE_KM = 10.0
 
 
 async def obtener_distancia_maxima(db: AsyncSession) -> float:
@@ -137,8 +137,13 @@ async def buscar_talleres_cercanos_con_especialidades(
     talleres_validos = []
     
     for taller, distancia in talleres_cercanos:
-        # Si no hay especialidades requeridas, no devolvemos talleres irrelevantes
+        # Si no hay especialidades requeridas, agregamos el taller directamente
         if not especialidades_requeridas:
+            talleres_validos.append({
+                'taller': taller,
+                'distancia_km': round(distancia / 1000, 2),
+                'especialidades_disponibles': []
+            })
             continue
 
         # Verificar que el taller tenga técnicos con al menos una especialidad requerida
