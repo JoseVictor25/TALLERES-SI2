@@ -29,6 +29,7 @@ from geoalchemy2.shape import to_shape
 from pydantic import BaseModel
 from datetime import datetime
 import math
+from app.core.websocket_manager import manager as ws_manager
 
 router = APIRouter(prefix="/tecnico", tags=["Técnico - Servicios Móvil"])
 
@@ -537,6 +538,18 @@ async def actualizar_estado_servicio(
         await db.commit()
         await db.refresh(servicio)
         
+        # Broadcast WS: notificar cambio de estado a clientes y admin taller
+        broadcast_data = {
+            "tipo": "estado_actualizado",
+            "servicio_id": servicio.id,
+            "estado": servicio.estado.value,
+            "estado_descripcion": get_estado_descripcion(servicio.estado.value),
+            "timestamp": ahora.isoformat()
+        }
+        await ws_manager.broadcast(f"servicio_{servicio_id}", broadcast_data)
+        # También notificar al canal del taller
+        await ws_manager.broadcast(f"taller_{servicio.id_taller}", broadcast_data)
+        
         return {
             "message": "Estado actualizado exitosamente",
             "servicio_id": servicio.id,
@@ -605,3 +618,5 @@ async def actualizar_ubicacion_tecnico(
         "latitud": request.latitud,
         "longitud": request.longitud
     }
+    # Nota: El tracking GPS en tiempo real ahora va por el canal WebSocket
+    # ws/tracking/{servicio_id}. Este endpoint REST se mantiene como fallback.

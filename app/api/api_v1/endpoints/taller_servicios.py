@@ -25,6 +25,7 @@ from app.schemas.servicio import (
     CotizacionCreate
 )
 from app.services import servicio_service
+from app.core.websocket_manager import manager as ws_manager
 from app.crud import (
     solicitud_servicio as solicitud_servicio_crud,
     diagnostico as diagnostico_crud,
@@ -267,6 +268,17 @@ async def cotizar_solicitud(
             id_taller=id_taller,
             costo_estimado=cotizacion_data.costo_estimado
         )
+        
+        # Broadcast WS: notificar al cliente que su solicitud fue cotizada
+        from datetime import datetime, timezone
+        await ws_manager.broadcast(f"taller_{id_taller}", {
+            "tipo": "solicitud_cotizada",
+            "solicitud_id": solicitud_id,
+            "estado": "cotizada",
+            "costo_estimado": float(cotizacion_data.costo_estimado),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
         return await obtener_detalle_solicitud(solicitud_id, id_taller, current_usuario, db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -349,6 +361,16 @@ async def rechazar_solicitud(
     
     try:
         await servicio_service.rechazar_solicitud_servicio(db, solicitud_id, id_taller)
+        
+        # Broadcast WS: notificar que la solicitud fue rechazada
+        from datetime import datetime, timezone
+        await ws_manager.broadcast(f"taller_{id_taller}", {
+            "tipo": "solicitud_rechazada",
+            "solicitud_id": solicitud_id,
+            "estado": "rechazada",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
         return {"message": "Solicitud rechazada exitosamente"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

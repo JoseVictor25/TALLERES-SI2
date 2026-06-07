@@ -27,6 +27,7 @@ from .endpoints import (
     admin_bitacora,
     tenants
 )
+from .endpoints import websockets as ws_endpoints
 
 api_router = APIRouter()
 
@@ -55,3 +56,4 @@ api_router.include_router(mensajes.router)
 api_router.include_router(pagos.router)
 api_router.include_router(notifications.router)
 api_router.include_router(tenants.router)
+api_router.include_router(ws_endpoints.router)

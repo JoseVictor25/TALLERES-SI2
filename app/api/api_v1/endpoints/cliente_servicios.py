@@ -30,7 +30,8 @@ from app.crud import crud_valoracion
 from app.services import valoracion_service, servicio_service
 from app.schemas.servicio import SolicitudServicioListResponse
 from geoalchemy2.shape import to_shape
-from datetime import datetime
+from datetime import datetime, timezone
+from app.core.websocket_manager import manager as ws_manager
 
 router = APIRouter(prefix="/cliente", tags=["Cliente - Seguimiento de Servicios"])
 
@@ -64,6 +65,16 @@ async def aceptar_cotizacion(
             id_solicitud=solicitud_id,
             id_persona_cliente=current_usuario.id_persona
         )
+        
+        # Broadcast WS: notificar al taller que el cliente aceptó la cotización
+        await ws_manager.broadcast(f"taller_{solicitud.id_taller}", {
+            "tipo": "cotizacion_respondida",
+            "solicitud_id": solicitud_id,
+            "aceptada": True,
+            "estado": solicitud.estado.value,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
         return {"message": "Cotización aceptada", "estado": solicitud.estado.value}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -84,6 +95,16 @@ async def rechazar_cotizacion(
             id_solicitud=solicitud_id,
             id_persona_cliente=current_usuario.id_persona
         )
+        
+        # Broadcast WS: notificar al taller que el cliente rechazó la cotización
+        await ws_manager.broadcast(f"taller_{solicitud.id_taller}", {
+            "tipo": "cotizacion_respondida",
+            "solicitud_id": solicitud_id,
+            "aceptada": False,
+            "estado": solicitud.estado.value,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
         return {"message": "Cotización rechazada", "estado": solicitud.estado.value}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
