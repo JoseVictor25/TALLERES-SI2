@@ -15,7 +15,8 @@ class CRUDSolicitudDiagnostico(CRUDBase[SolicitudDiagnostico]):
             select(SolicitudDiagnostico)
             .options(
                 selectinload(SolicitudDiagnostico.evidencias),
-                selectinload(SolicitudDiagnostico.diagnostico).selectinload(Diagnostico.incidentes).selectinload(Incidente.tipo_incidente)
+                selectinload(SolicitudDiagnostico.diagnostico).selectinload(Diagnostico.incidentes).selectinload(Incidente.tipo_incidente),
+                selectinload(SolicitudDiagnostico.diagnostico).selectinload(Diagnostico.solicitudes_servicio)
             )
             .where(SolicitudDiagnostico.id == id)
         )
@@ -28,7 +29,8 @@ class CRUDSolicitudDiagnostico(CRUDBase[SolicitudDiagnostico]):
             select(SolicitudDiagnostico)
             .options(
                 selectinload(SolicitudDiagnostico.evidencias),
-                selectinload(SolicitudDiagnostico.diagnostico).selectinload(Diagnostico.incidentes).selectinload(Incidente.tipo_incidente)
+                selectinload(SolicitudDiagnostico.diagnostico).selectinload(Diagnostico.incidentes).selectinload(Incidente.tipo_incidente),
+                selectinload(SolicitudDiagnostico.diagnostico).selectinload(Diagnostico.solicitudes_servicio)
             )
             .where(SolicitudDiagnostico.id_persona == id_persona)
             .order_by(SolicitudDiagnostico.fecha.desc())

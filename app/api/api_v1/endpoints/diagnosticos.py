@@ -142,14 +142,33 @@ async def listar_mis_solicitudes(
     current_persona: Persona = Depends(get_current_persona),
     db: AsyncSession = Depends(get_db)
 ):
+    from sqlalchemy.orm import selectinload, joinedload
+    from sqlalchemy import select
+    from app.models.solicitud_diagnostico import SolicitudDiagnostico
+    from app.models.diagnostico import Diagnostico
+    from app.models.solicitud_servicio import SolicitudServicio, EstadoSolicitudServicio
+    from app.models.incidente import Incidente
+    
+    # Usar el CRUD que ya carga correctamente las relaciones base
     items, _ = await solicitud_crud.get_by_persona_paginated(db, current_persona.id, 0, 100)
     
-    # Convertir ubicaciones a string para serialización
+    # Convertir ubicaciones a string para serialización y verificar si todas las solicitudes de servicio están rechazadas
     from geoalchemy2.shape import to_shape
     for solicitud in items:
         if solicitud.ubicacion:
             point = to_shape(solicitud.ubicacion)
             solicitud.ubicacion = f"{point.y},{point.x}"
+            
+        # Si tiene diagnóstico, verificar el estado de sus solicitudes de servicio
+        if solicitud.diagnostico and hasattr(solicitud.diagnostico, 'solicitudes_servicio'):
+            servicios = solicitud.diagnostico.solicitudes_servicio
+            if servicios and len(servicios) > 0:
+                todas_rechazadas = all(s.estado == EstadoSolicitudServicio.rechazada for s in servicios)
+                alguna_activa = any(s.estado in [EstadoSolicitudServicio.pendiente, EstadoSolicitudServicio.cotizada, EstadoSolicitudServicio.aceptada] for s in servicios)
+                
+                if todas_rechazadas and not alguna_activa:
+                    from app.models.solicitud_diagnostico import EstadoSolicitudDiagnostico
+                    solicitud.estado = EstadoSolicitudDiagnostico.rechazada
     
     return items
 

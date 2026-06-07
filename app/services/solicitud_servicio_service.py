@@ -312,15 +312,29 @@ async def crear_solicitud_servicio_manual(
     if existe:
         raise ValueError("Ya existe una solicitud de servicio para este taller")
     
-    # Calcular distancia entre cliente y taller
+    # Calcular distancia entre cliente y taller de manera confiable usando Python
     distancia_km = None
     if solicitud_diag.ubicacion and taller.ubicacion:
-        result = await db.execute(
-            select(func.ST_Distance(solicitud_diag.ubicacion, taller.ubicacion))
-        )
-        distancia = result.scalar()
-        if distancia:
-            distancia_km = round(distancia / 1000, 2)
+        try:
+            from geoalchemy2.shape import to_shape
+            import math
+            p1 = to_shape(solicitud_diag.ubicacion) # point.x = lon, point.y = lat
+            p2 = to_shape(taller.ubicacion)
+            
+            lon1, lat1 = p1.x, p1.y
+            lon2, lat2 = p2.x, p2.y
+            
+            # Haversine formula
+            R = 6371.0 # Radio de la tierra en km
+            dlat = math.radians(lat2 - lat1)
+            dlon = math.radians(lon2 - lon1)
+            a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            distancia_km = round(R * c, 2)
+        except Exception as e:
+            import logging
+            logging.error(f"Error al calcular distancia_km: {e}")
+            distancia_km = None
     
     # Crear solicitud
     solicitud_data = {

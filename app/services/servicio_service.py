@@ -47,7 +47,8 @@ async def obtener_solicitudes_recientes(
                     EstadoSolicitudServicio.pendiente,
                     EstadoSolicitudServicio.cotizada,
                     EstadoSolicitudServicio.aceptada,
-                    EstadoSolicitudServicio.rechazada
+                    EstadoSolicitudServicio.rechazada,
+                    EstadoSolicitudServicio.cotizacion_rechazada
                 ]),
                 SolicitudServicio.fecha >= tiempo_limite
             )
@@ -161,8 +162,8 @@ async def cotizar_solicitud_servicio(
     if solicitud.id_taller != id_taller:
         raise ValueError("La solicitud no pertenece a este taller")
     
-    if solicitud.estado not in [EstadoSolicitudServicio.pendiente, EstadoSolicitudServicio.rechazada]:
-        raise ValueError("Solo se pueden cotizar solicitudes en estado pendiente o rechazada")
+    if solicitud.estado not in [EstadoSolicitudServicio.pendiente, EstadoSolicitudServicio.rechazada, EstadoSolicitudServicio.cotizacion_rechazada]:
+        raise ValueError("Solo se pueden cotizar solicitudes en estado pendiente, rechazada o cotizacion_rechazada")
     
     solicitud.costo_estimado = costo_estimado
     solicitud.estado = EstadoSolicitudServicio.cotizada
@@ -430,7 +431,7 @@ async def rechazar_cotizacion_cliente(
     if solicitud.estado != EstadoSolicitudServicio.cotizada:
         raise ValueError("La solicitud no está en estado cotizada")
         
-    solicitud.estado = EstadoSolicitudServicio.rechazada
+    solicitud.estado = EstadoSolicitudServicio.cotizacion_rechazada
     
     await db.commit()
     await db.refresh(solicitud)

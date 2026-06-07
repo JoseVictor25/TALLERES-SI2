@@ -10,6 +10,7 @@ class EstadoSolicitudDiagnostico(str, enum.Enum):
     diagnosticada = "diagnosticada"
     cancelada = "cancelada"
     error = "error"
+    rechazada = "rechazada"
 
 
 class SolicitudDiagnostico(Base):

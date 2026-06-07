@@ -17,6 +17,7 @@ class EstadoSolicitudServicio(str, enum.Enum):
     cotizada = "cotizada"
     aceptada = "aceptada"
     rechazada = "rechazada"
+    cotizacion_rechazada = "cotizacion_rechazada"
     cancelada = "cancelada"
     expirada = "expirada"
 
