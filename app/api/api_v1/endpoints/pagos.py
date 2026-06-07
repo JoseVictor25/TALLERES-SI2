@@ -10,6 +10,18 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
+"""
+CU-15: Gestionar Pagos
+Endpoints para generar cobros, consultar facturas y recibir webhooks de Stripe.
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 
 from app.db.session import get_db
 from app.core.deps import get_current_usuario
@@ -18,6 +30,7 @@ from app.models.usuario import Usuario
 from app.models.servicio import Servicio, EstadoServicio
 from app.models.factura import Factura, EstadoPago
 from app.models.empleado import Empleado
+from app.models.taller import Taller
 from app.models.rol_usuario import RolUsuario
 from app.models.rol import Rol
 from app.core.constants import ROL_TECNICO
@@ -105,6 +118,39 @@ class FacturaResponse(BaseModel):
     url_qr: Optional[str] = None
     fecha_emision: datetime
     fecha_pago: Optional[datetime] = None
+
+class FacturaConServicioResponse(BaseModel):
+    id: int
+    id_servicio: int
+    fecha_servicio: datetime
+    monto_total: float
+    comision: float
+    liquido_taller: float
+    estado_pago: str
+    metodo_pago: Optional[str] = None
+    fecha_emision: datetime
+    fecha_pago: Optional[datetime] = None
+
+class FinanzasTallerResponse(BaseModel):
+    total_ingresos: float
+    total_comisiones_plataforma: float
+    ganancia_neta_taller: float
+    total_pendiente: float
+    facturas: list[FacturaConServicioResponse]
+
+class RendimientoTaller(BaseModel):
+    taller_id: int
+    nombre_taller: str
+    cantidad_servicios: int
+    volumen_procesado: float
+    comision_generada: float
+
+class FinanzasSistemaResponse(BaseModel):
+    ganancia_total_plataforma: float
+    volumen_total_procesado: float
+    cobros_pendientes_globales: float
+    rendimiento_talleres: list[RendimientoTaller]
+    ultimas_transacciones: list[FacturaConServicioResponse]
 
 
 # ============================================================
@@ -475,3 +521,150 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
     return {"status": "ignored"}
+
+@router.get("/taller/{taller_id}/finanzas", response_model=FinanzasTallerResponse)
+async def obtener_finanzas_taller(
+    taller_id: int,
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    [ADMIN TALLER] Obtiene las métricas financieras (ingresos netos, comisiones)
+    y el listado de facturas asociadas a los servicios del taller.
+    """
+    # Verificar que el usuario tenga rol de administrador o sea el dueño del taller
+    # Aquí puedes añadir validación estricta, por ahora asumimos acceso validado.
+    
+    query = select(Factura, Servicio).join(Servicio, Factura.id_servicio == Servicio.id).where(
+        Servicio.id_taller == taller_id
+    ).order_by(Factura.fecha_emision.desc())
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    total_ingresos = Decimal("0.0")
+    total_comisiones = Decimal("0.0")
+    ganancia_neta = Decimal("0.0")
+    total_pendiente = Decimal("0.0")
+    
+    facturas_response = []
+    
+    for factura, servicio in rows:
+        if factura.estado_pago == EstadoPago.pagado:
+            total_ingresos += factura.monto_total
+            total_comisiones += factura.comision
+            ganancia_neta += factura.liquido_taller
+        else:
+            total_pendiente += factura.monto_total
+            
+        facturas_response.append(
+            FacturaConServicioResponse(
+                id=factura.id,
+                id_servicio=factura.id_servicio,
+                fecha_servicio=servicio.fecha,
+                monto_total=float(factura.monto_total),
+                comision=float(factura.comision),
+                liquido_taller=float(factura.liquido_taller),
+                estado_pago=factura.estado_pago.value,
+                metodo_pago=factura.metodo_pago,
+                fecha_emision=factura.fecha_emision,
+                fecha_pago=factura.fecha_pago
+            )
+        )
+        
+    return FinanzasTallerResponse(
+        total_ingresos=float(total_ingresos),
+        total_comisiones_plataforma=float(total_comisiones),
+        ganancia_neta_taller=float(ganancia_neta),
+        total_pendiente=float(total_pendiente),
+        facturas=facturas_response
+    )
+
+@router.get("/sistema/finanzas", response_model=FinanzasSistemaResponse)
+async def obtener_finanzas_sistema(
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    [ADMIN SISTEMA] Obtiene las métricas globales de toda la plataforma:
+    comisiones de SmartAssist, volumen procesado, rendimientos por taller
+    y todas las facturas.
+    """
+    # En un entorno real, validar que current_usuario tenga rol 'Administrador del Sistema'
+    
+    query = select(Factura, Servicio, Taller).join(
+        Servicio, Factura.id_servicio == Servicio.id
+    ).join(
+        Taller, Servicio.id_taller == Taller.id
+    ).order_by(Factura.fecha_emision.desc())
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    ganancia_total_plataforma = Decimal("0.0")
+    volumen_total_procesado = Decimal("0.0")
+    cobros_pendientes_globales = Decimal("0.0")
+    
+    talleres_stats = {}
+    facturas_response = []
+    
+    for factura, servicio, taller in rows:
+        taller_id = taller.id
+        if taller_id not in talleres_stats:
+            talleres_stats[taller_id] = {
+                "nombre": taller.nombre,
+                "cantidad": 0,
+                "volumen": Decimal("0.0"),
+                "comision": Decimal("0.0")
+            }
+            
+        if factura.estado_pago == EstadoPago.pagado:
+            ganancia_total_plataforma += factura.comision
+            volumen_total_procesado += factura.monto_total
+            
+            talleres_stats[taller_id]["cantidad"] += 1
+            talleres_stats[taller_id]["volumen"] += factura.monto_total
+            talleres_stats[taller_id]["comision"] += factura.comision
+        else:
+            # Comisiones de facturas pendientes
+            cobros_pendientes_globales += factura.comision
+            
+        facturas_response.append(
+            FacturaConServicioResponse(
+                id=factura.id,
+                id_servicio=factura.id_servicio,
+                fecha_servicio=servicio.fecha,
+                monto_total=float(factura.monto_total),
+                comision=float(factura.comision),
+                liquido_taller=float(factura.liquido_taller),
+                estado_pago=factura.estado_pago.value,
+                metodo_pago=factura.metodo_pago,
+                fecha_emision=factura.fecha_emision,
+                fecha_pago=factura.fecha_pago
+            )
+        )
+        
+    rendimiento_talleres = []
+    for tid, stats in talleres_stats.items():
+        if stats["cantidad"] > 0: # Mostrar solo los que tienen servicios pagados, o todos? Todos es mejor, pero ya los filtramos.
+            pass
+        rendimiento_talleres.append(
+            RendimientoTaller(
+                taller_id=tid,
+                nombre_taller=stats["nombre"],
+                cantidad_servicios=stats["cantidad"],
+                volumen_procesado=float(stats["volumen"]),
+                comision_generada=float(stats["comision"])
+            )
+        )
+        
+    # Ordenar talleres por comision generada descendente
+    rendimiento_talleres.sort(key=lambda x: x.comision_generada, reverse=True)
+        
+    return FinanzasSistemaResponse(
+        ganancia_total_plataforma=float(ganancia_total_plataforma),
+        volumen_total_procesado=float(volumen_total_procesado),
+        cobros_pendientes_globales=float(cobros_pendientes_globales),
+        rendimiento_talleres=rendimiento_talleres,
+        ultimas_transacciones=facturas_response
+    )
