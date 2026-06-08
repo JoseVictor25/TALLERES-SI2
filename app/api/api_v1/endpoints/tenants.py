@@ -193,22 +193,33 @@ async def verify_stripe_session(
         raise HTTPException(status_code=400, detail=str(e))
         
     if session.payment_status == 'paid':
-        id_usuario = session.get("metadata", {}).get("id_usuario_creador")
-        taller_name = session.get("metadata", {}).get("taller_name")
+        metadata = getattr(session, 'metadata', {})
+        
+        # Extraer usando getattr o diccionarios dependiendo del tipo
+        if isinstance(metadata, dict):
+            id_usuario = metadata.get("id_usuario_creador")
+            taller_name = metadata.get("taller_name")
+        else:
+            id_usuario = getattr(metadata, "id_usuario_creador", None)
+            taller_name = getattr(metadata, "taller_name", None)
+            
+        stripe_subscription_id = getattr(session, "subscription", None)
+        stripe_customer_id = getattr(session, "customer", None)
         
         # Verificar si el tenant ya se creó con esta sesión (para evitar duplicados)
         from sqlalchemy import select
-        result = await db.execute(select(Tenant).where(Tenant.stripe_subscription_id == session.get("subscription")))
-        if result.scalar_one_or_none():
-            return {"status": "already_processed"}
+        if stripe_subscription_id:
+            result = await db.execute(select(Tenant).where(Tenant.stripe_subscription_id == stripe_subscription_id))
+            if result.scalar_one_or_none():
+                return {"status": "already_processed"}
             
         if id_usuario:
             nombre_taller = taller_name if taller_name else f"Red de Talleres {id_usuario}"
             nuevo_tenant = Tenant(
                 nombre=nombre_taller,
                 codigo_acceso=f"ORG-{id_usuario}",
-                stripe_customer_id=session.get("customer"),
-                stripe_subscription_id=session.get("subscription")
+                stripe_customer_id=stripe_customer_id,
+                stripe_subscription_id=stripe_subscription_id
             )
             db.add(nuevo_tenant)
             await db.commit()
