@@ -178,6 +178,104 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
     return {"status": "success"}
 
+@router.post("/verify-session")
+async def verify_stripe_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Verifica manualmente la sesión de Stripe (útil si el webhook no está configurado).
+    Si está pagada, crea el tenant y asigna el rol si no existen.
+    """
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    if session.payment_status == 'paid':
+        id_usuario = session.get("metadata", {}).get("id_usuario_creador")
+        taller_name = session.get("metadata", {}).get("taller_name")
+        
+        # Verificar si el tenant ya se creó con esta sesión (para evitar duplicados)
+        from sqlalchemy import select
+        result = await db.execute(select(Tenant).where(Tenant.stripe_subscription_id == session.get("subscription")))
+        if result.scalar_one_or_none():
+            return {"status": "already_processed"}
+            
+        if id_usuario:
+            nombre_taller = taller_name if taller_name else f"Red de Talleres {id_usuario}"
+            nuevo_tenant = Tenant(
+                nombre=nombre_taller,
+                codigo_acceso=f"ORG-{id_usuario}",
+                stripe_customer_id=session.get("customer"),
+                stripe_subscription_id=session.get("subscription")
+            )
+            db.add(nuevo_tenant)
+            await db.commit()
+            await db.refresh(nuevo_tenant)
+            
+            from app.crud.crud_usuario import usuario as crud_usuario
+            usuario = await crud_usuario.get(db, int(id_usuario))
+            if usuario:
+                usuario.tenant_id = nuevo_tenant.id
+                from app.models.rol import Rol
+                from app.models.rol_usuario import RolUsuario
+                
+                result = await db.execute(select(Rol).where(Rol.nombre == "Administrador del Taller"))
+                rol_admin_taller = result.scalar_one_or_none()
+                
+                if not rol_admin_taller:
+                    rol_admin_taller = Rol(nombre="Administrador del Taller", descripcion="Rol admin taller")
+                    db.add(rol_admin_taller)
+                    await db.commit()
+                    await db.refresh(rol_admin_taller)
+                
+                from app.models.solicitud_afiliacion import SolicitudAfiliacion, EstadoSolicitudAfiliacion
+                from app.models.taller import Taller, EstadoTaller
+                
+                nueva_soli = SolicitudAfiliacion(
+                    nombre=nombre_taller,
+                    ubicacion='POINT(-63.18117 -17.78629)',
+                    telefono="00000000",
+                    email="admin@taller.com",
+                    estado=EstadoSolicitudAfiliacion.aprobada,
+                    id_usuario_solicita=usuario.id
+                )
+                db.add(nueva_soli)
+                await db.flush()
+                
+                nuevo_taller = Taller(
+                    nombre=nombre_taller,
+                    ubicacion='POINT(-63.18117 -17.78629)',
+                    telefono="00000000",
+                    email="admin@taller.com",
+                    estado=EstadoTaller.activo,
+                    id_solicitud_afiliacion=nueva_soli.id,
+                    tenant_id=nuevo_tenant.id
+                )
+                db.add(nuevo_taller)
+                await db.flush()
+                
+                result_ru = await db.execute(
+                    select(RolUsuario).where(
+                        RolUsuario.id_usuario == usuario.id,
+                        RolUsuario.id_rol == rol_admin_taller.id,
+                        RolUsuario.id_taller == nuevo_taller.id
+                    )
+                )
+                if not result_ru.scalar_one_or_none():
+                    nuevo_rol = RolUsuario(
+                        id_usuario=usuario.id,
+                        id_rol=rol_admin_taller.id,
+                        id_taller=nuevo_taller.id
+                    )
+                    db.add(nuevo_rol)
+
+                await db.commit()
+                return {"status": "success", "tenant_id": nuevo_tenant.id}
+                
+    return {"status": "unpaid"}
+
 @router.post("/simulate-webhook")
 async def simulate_stripe_webhook(
     id_usuario: int,
