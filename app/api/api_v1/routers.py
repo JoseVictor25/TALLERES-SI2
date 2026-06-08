@@ -25,7 +25,8 @@ from .endpoints import (
     admin_usuarios,
     notifications,
     admin_bitacora,
-    tenants
+    tenants,
+    analitica
 )
 from .endpoints import websockets as ws_endpoints
 
@@ -56,4 +57,5 @@ api_router.include_router(mensajes.router)
 api_router.include_router(pagos.router)
 api_router.include_router(notifications.router)
 api_router.include_router(tenants.router)
+api_router.include_router(analitica.router, prefix="/analitica", tags=["Analítica"])
 api_router.include_router(ws_endpoints.router)
