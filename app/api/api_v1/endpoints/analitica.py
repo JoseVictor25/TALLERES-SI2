@@ -15,10 +15,10 @@ from geoalchemy2.functions import ST_X, ST_Y
 router = APIRouter()
 
 @router.get("/taller/{taller_id}/kpis")
-async def get_kpis(
+async def get_kpis_taller(
     taller_id: int,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: Usuario = Depends(deps.get_current_active_user)
+    current_user: Usuario = Depends(deps.get_current_usuario)
 ):
     # Validar permisos
     if current_user.tenant_id is None:
