@@ -279,6 +279,14 @@ async def cotizar_solicitud(
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
+        # Enviar Notificación Push al cliente
+        from app.services.notification_service import notification_service
+        await notification_service.notificar_cotizacion_recibida(
+            db=db,
+            id_solicitud=solicitud_id,
+            costo_estimado=float(cotizacion_data.costo_estimado)
+        )
+        
         return await obtener_detalle_solicitud(solicitud_id, id_taller, current_usuario, db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

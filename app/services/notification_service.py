@@ -249,6 +249,60 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Error notificando servicio finalizado: {e}")
             return False
+            
+    async def notificar_cotizacion_recibida(
+        self,
+        db: AsyncSession,
+        id_solicitud: int,
+        costo_estimado: float
+    ) -> bool:
+        """
+        Notifica al cliente que un taller ha respondido con una cotización
+        """
+        try:
+            # Obtener datos del cliente a partir de la solicitud
+            result = await db.execute(
+                select(SolicitudDiagnostico, Persona).join(
+                    Diagnostico, SolicitudDiagnostico.id == Diagnostico.id_solicitud_diagnostico
+                ).join(
+                    SolicitudServicio, Diagnostico.id == SolicitudServicio.id_diagnostico
+                ).join(
+                    Persona, SolicitudDiagnostico.id_persona == Persona.id
+                ).where(
+                    SolicitudServicio.id == id_solicitud
+                )
+            )
+            
+            row = result.first()
+            if not row:
+                logger.warning(f"No se encontró cliente para solicitud de servicio {id_solicitud}")
+                return False
+            
+            solicitud_diag, persona = row
+            
+            # Obtener tokens FCM del cliente
+            tokens = await self.obtener_tokens_persona(db, persona.id)
+            
+            if not tokens:
+                logger.info(f"Cliente {persona.id} no tiene tokens FCM registrados")
+                return True
+            
+            # Enviar notificación
+            titulo = "¡Cotización Recibida!"
+            mensaje = f"Un taller ha enviado una cotización de {costo_estimado} BOB. Revisa los detalles en la app."
+            
+            datos_extra = {
+                "tipo": "solicitud_cotizada",
+                "solicitud_id": str(id_solicitud),
+                "costo_estimado": str(costo_estimado),
+                "accion": "abrir_cotizacion_detalle"
+            }
+            
+            return await self.enviar_notificacion_push(tokens, titulo, mensaje, datos_extra)
+            
+        except Exception as e:
+            logger.error(f"Error notificando cotización recibida: {e}")
+            return False
     
     def _generar_mensaje_estado(self, estado: str) -> tuple[str, str]:
         """
