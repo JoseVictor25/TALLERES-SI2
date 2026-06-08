@@ -263,8 +263,21 @@ async def crear_solicitudes_servicio_automaticas(
                 'distancia_km': taller_info['distancia_km']
             }
             
-            await solicitud_servicio_crud.create(db, solicitud_data)
+            solicitud = await solicitud_servicio_crud.create(db, solicitud_data)
             solicitudes_creadas += 1
+            
+            # Broadcast WS: Notificar al taller de la nueva solicitud
+            try:
+                from app.core.websocket_manager import manager as ws_manager
+                from datetime import datetime, timezone
+                await ws_manager.broadcast(f"taller_{taller.id}", {
+                    "tipo": "nueva_solicitud",
+                    "solicitud_id": solicitud.id,
+                    "estado": "pendiente",
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                })
+            except Exception as e:
+                logger.error(f"Error al enviar WS nueva_solicitud (auto): {e}")
         
         talleres_sugeridos.append({
             'id': taller.id,
@@ -353,5 +366,18 @@ async def crear_solicitud_servicio_manual(
     
     solicitud = await solicitud_servicio_crud.create(db, solicitud_data)
     await db.commit()
+    
+    # Broadcast WS: Notificar al taller de la nueva solicitud
+    try:
+        from app.core.websocket_manager import manager as ws_manager
+        from datetime import datetime, timezone
+        await ws_manager.broadcast(f"taller_{id_taller}", {
+            "tipo": "nueva_solicitud",
+            "solicitud_id": solicitud.id,
+            "estado": "pendiente",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error al enviar WS nueva_solicitud (manual): {e}")
     
     return solicitud
