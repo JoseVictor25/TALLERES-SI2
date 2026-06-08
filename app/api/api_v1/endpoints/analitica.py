@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from app.api import deps
+from app.core import deps
 from app.models.usuario import Usuario
 from app.models.taller import Taller
 from app.models.servicio import Servicio, EstadoServicio
