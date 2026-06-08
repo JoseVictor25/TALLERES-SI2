@@ -15,19 +15,33 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 async def subscribe(
     plan: str = Query("basico", description="El plan elegido"),
     taller_name: str = Query(None, description="El nombre del taller"),
+    success_url: str = Query(..., description="URL de exito"),
+    cancel_url: str = Query(..., description="URL de cancelacion"),
     current_usuario: Usuario = Depends(get_current_usuario),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Endpoint temporal para iniciar la suscripción y devolver una URL de Checkout
+    Inicia la suscripción a un plan y devuelve la URL de Checkout de Stripe.
     """
     usuario = current_usuario
     if not usuario:
         raise HTTPException(status_code=400, detail="Usuario no encontrado")
 
     try:
-        # Aquí en producción se conectaría a Stripe para generar la sesión
-        # y se enviaría el metadata={'usuario_id': usuario.id, 'taller_name': taller_name}
+        # Precios basados en el plan
+        if plan == 'basico':
+            monto = 15000  # $150.00 en centavos
+            nombre_plan = 'Plan Básico - Plataforma de Talleres'
+        elif plan == 'pro' or plan == 'estandar':
+            monto = 30000  # $300.00 en centavos
+            nombre_plan = 'Plan Pro - Plataforma de Talleres'
+        elif plan == 'premium':
+            monto = 60000  # $600.00 en centavos
+            nombre_plan = 'Plan Premium - Plataforma de Talleres'
+        else:
+            monto = 15000
+            nombre_plan = 'Plan Básico - Plataforma de Talleres'
+
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[
@@ -35,19 +49,20 @@ async def subscribe(
                     'price_data': {
                         'currency': 'usd',
                         'product_data': {
-                            'name': 'Suscripción Plataforma Inteligente de Talleres',
+                            'name': nombre_plan,
                         },
-                        'unit_amount': 2999, # $29.99
+                        'unit_amount': monto,
                         'recurring': {'interval': 'month'}
                     },
                     'quantity': 1,
                 },
             ],
             mode='subscription',
-            success_url=f"{settings.FRONTEND_URL}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.FRONTEND_URL}/payment-cancel",
+            success_url=success_url,
+            cancel_url=cancel_url,
             metadata={
-                "id_usuario_creador": current_usuario.id
+                "id_usuario_creador": current_usuario.id,
+                "taller_name": taller_name
             }
         )
         return {"url": checkout_session.url}
