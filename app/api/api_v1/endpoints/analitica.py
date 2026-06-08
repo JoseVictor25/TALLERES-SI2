@@ -40,20 +40,22 @@ async def get_kpis_taller(
 
     # 3. Incidentes por tipo
     query_tipos = (
-        select(TipoIncidente.nombre, func.count(Incidente.id_tipo_incidente))
+        select(TipoIncidente.concepto, func.count(Incidente.id_tipo_incidente))
         .join(Incidente.tipo_incidente)
         .join(Diagnostico, Diagnostico.id == Incidente.id_diagnostico)
         .join(SolicitudServicio, SolicitudServicio.id_diagnostico == Diagnostico.id)
         .where(SolicitudServicio.id_taller == taller_id)
-        .group_by(TipoIncidente.nombre)
+        .group_by(TipoIncidente.concepto)
     )
     result_tipos = await db.execute(query_tipos)
     incidentes_por_tipo = [{"tipo": row[0], "cantidad": row[1]} for row in result_tipos]
 
     # 4. Zonas de incidentes
+    from sqlalchemy import cast
+    from geoalchemy2.types import Geometry
     query_zonas = select(
-        ST_Y(SolicitudServicio.ubicacion).label('lat'),
-        ST_X(SolicitudServicio.ubicacion).label('lng')
+        ST_Y(cast(SolicitudServicio.ubicacion, Geometry)).label('lat'),
+        ST_X(cast(SolicitudServicio.ubicacion, Geometry)).label('lng')
     ).where(SolicitudServicio.id_taller == taller_id, SolicitudServicio.ubicacion != None)
     result_zonas = await db.execute(query_zonas)
     zonas = [{"lat": row.lat, "lng": row.lng, "intensidad": 1} for row in result_zonas if row.lat and row.lng]
