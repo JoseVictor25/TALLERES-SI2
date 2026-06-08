@@ -355,7 +355,8 @@ async def obtener_ruta_tecnico(
             data = response.json()
             
             if data.get("code") != "Ok":
-                raise HTTPException(status_code=500, detail="No se pudo calcular la ruta")
+                print(f"OSRM no pudo calcular ruta: {data.get('code')}")
+                raise httpx.HTTPError("OSRM no pudo calcular la ruta")
             
             route = data["routes"][0]
             geometry = route["geometry"]["coordinates"]
