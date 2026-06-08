@@ -121,8 +121,8 @@ async def send_otp_email_safe(
         temp_data.update(extra_temp_data)
     store_otp(email, otp, temp_data=temp_data)
 
-    # Enviar email en un hilo separado para no bloquear
+    # Enviar email en un hilo separado para no bloquear la respuesta HTTP
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, _send_otp_email_sync, email, otp)
+    loop.run_in_executor(None, _send_otp_email_sync, email, otp)
 
     return otp
