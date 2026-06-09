@@ -78,13 +78,13 @@ async def get_kpis_taller(
     total_metricas = await db.scalar(query_total_metricas) or 0
     porcentaje_sla = (sla_cumplidos / total_metricas * 100) if total_metricas > 0 else 100.0
 
-    # 7. Talleres más eficientes (ranking en el tenant basado en tiempo de resolución + llegada)
+    # 7. Talleres más eficientes (ranking global: todos los talleres del sistema con métricas)
     query_ranking = (
         select(Taller.id, Taller.nombre, func.avg(Metrica.tiempo_resolucion).label("avg_resolucion"))
         .join(Servicio, Servicio.id_taller == Taller.id)
         .join(Metrica, Metrica.id_servicio == Servicio.id)
-        .where(Taller.tenant_id == current_user.tenant_id)
-        .group_by(Taller.id)
+        .where(Metrica.tiempo_resolucion.isnot(None))  # Solo talleres con métricas reales
+        .group_by(Taller.id, Taller.nombre)
         .order_by(func.avg(Metrica.tiempo_resolucion).asc())
     )
     result_ranking = await db.execute(query_ranking)

@@ -524,16 +524,68 @@ async def actualizar_estado_servicio(
         )
         db.add(nuevo_historial)
         
-        # 4. Actualizar Métricas si corresponde
-        if nuevo_estado in ['en_lugar', 'finalizado']:
-            result_metrica = await db.execute(
-                select(Metrica).where(Metrica.id_servicio == servicio_id)
+        # 4. Actualizar Métricas según el estado alcanzado
+        result_metrica = await db.execute(
+            select(Metrica).where(Metrica.id_servicio == servicio_id)
+        )
+        metrica = result_metrica.scalar_one_or_none()
+        if not metrica:
+            metrica = Metrica(id_servicio=servicio_id)
+            db.add(metrica)
+
+        if nuevo_estado == 'en_camino':
+            # tiempo_respuesta: desde creación del servicio hasta que el técnico sale
+            # Buscamos el historial del estado tecnico_asignado para obtener la fecha real de asignación
+            result_asig = await db.execute(
+                select(HistorialEstadoServicio)
+                .where(
+                    HistorialEstadoServicio.id_servicio == servicio_id,
+                    HistorialEstadoServicio.estado == EstadoServicio.tecnico_asignado
+                )
+                .order_by(HistorialEstadoServicio.tiempo.asc())
+                .limit(1)
             )
-            metrica = result_metrica.scalar_one_or_none()
-            
-            if not metrica:
-                metrica = Metrica(id_servicio=servicio_id)
-                db.add(metrica)
+            estado_asignado = result_asig.scalar_one_or_none()
+            if estado_asignado:
+                metrica.tiempo_respuesta = ahora - estado_asignado.tiempo
+            else:
+                # Fallback: usar fecha de creación del servicio
+                if servicio.fecha:
+                    fecha_creacion = servicio.fecha
+                    if fecha_creacion.tzinfo is None:
+                        from datetime import timezone as tz
+                        fecha_creacion = fecha_creacion.replace(tzinfo=tz.utc)
+                    metrica.tiempo_respuesta = ahora - fecha_creacion
+
+        elif nuevo_estado == 'en_lugar':
+            # tiempo_llegada: desde en_camino hasta en_lugar
+            result_camino = await db.execute(
+                select(HistorialEstadoServicio)
+                .where(
+                    HistorialEstadoServicio.id_servicio == servicio_id,
+                    HistorialEstadoServicio.estado == EstadoServicio.en_camino
+                )
+                .order_by(HistorialEstadoServicio.tiempo.asc())
+                .limit(1)
+            )
+            estado_en_camino = result_camino.scalar_one_or_none()
+            if estado_en_camino:
+                metrica.tiempo_llegada = ahora - estado_en_camino.tiempo
+
+        elif nuevo_estado == 'finalizado':
+            # tiempo_resolucion: desde en_lugar hasta finalizado
+            result_lugar = await db.execute(
+                select(HistorialEstadoServicio)
+                .where(
+                    HistorialEstadoServicio.id_servicio == servicio_id,
+                    HistorialEstadoServicio.estado == EstadoServicio.en_lugar
+                )
+                .order_by(HistorialEstadoServicio.tiempo.asc())
+                .limit(1)
+            )
+            estado_en_lugar = result_lugar.scalar_one_or_none()
+            if estado_en_lugar:
+                metrica.tiempo_resolucion = ahora - estado_en_lugar.tiempo
         
         await db.commit()
         await db.refresh(servicio)
