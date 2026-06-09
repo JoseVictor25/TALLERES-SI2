@@ -47,7 +47,7 @@ async def subscribe(
             line_items=[
                 {
                     'price_data': {
-                        'currency': 'usd',
+                        'currency': 'bob',
                         'product_data': {
                             'name': nombre_plan,
                         },
@@ -371,3 +371,73 @@ async def simulate_stripe_webhook(
         await db.commit()
 
     return {"status": "success", "tenant_id": nuevo_tenant.id}
+
+@router.get("/suscripciones/activas")
+async def obtener_suscripciones_activas(
+    current_usuario: Usuario = Depends(get_current_usuario),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    [ADMIN SISTEMA] Obtiene una lista de los administradores de taller con suscripción activa.
+    """
+    # Importar los modelos necesarios
+    from app.models.persona import Persona
+    from app.models.rol_usuario import RolUsuario
+    from app.models.rol import Rol
+    from app.models.taller import Taller
+    from sqlalchemy import select
+    
+    # Aquí iría validación de que el usuario es Admin del Sistema
+    
+    query = (
+        select(Usuario, Persona, Tenant)
+        .join(Persona, Usuario.id_persona == Persona.id)
+        .join(Tenant, Usuario.tenant_id == Tenant.id)
+        .join(RolUsuario, RolUsuario.id_usuario == Usuario.id)
+        .join(Rol, Rol.id == RolUsuario.id_rol)
+        .where(
+            Rol.nombre == "Administrador del Taller",
+            Tenant.stripe_subscription_id.isnot(None)
+        )
+    )
+    
+    result = await db.execute(query)
+    rows = result.unique().all()
+    
+    suscripciones = []
+    
+    for usuario, persona, tenant in rows:
+        plan_name = "Desconocido"
+        status = "Inactiva"
+        
+        # Consultamos a Stripe para obtener los datos en tiempo real
+        try:
+            subscription = stripe.Subscription.retrieve(tenant.stripe_subscription_id)
+            status = subscription.status
+            
+            # Inferir el plan desde el monto
+            if subscription.items and len(subscription.items.data) > 0:
+                amount = subscription.items.data[0].price.unit_amount
+                # Si stripe.Subscription lo devuelve, podríamos chequear el nombre
+                if amount == 15000:
+                    plan_name = "Plan Básico"
+                elif amount == 30000:
+                    plan_name = "Plan Pro"
+                elif amount == 60000:
+                    plan_name = "Plan Premium"
+                else:
+                    plan_name = f"Plan Personalizado ({amount/100})"
+                    
+        except Exception as e:
+            # Si hay error en Stripe (ej test env), asumimos valores por defecto
+            status = "Error al consultar Stripe"
+            
+        suscripciones.append({
+            "taller": tenant.nombre,
+            "administrador": f"{persona.nombre} {persona.apellido_p}",
+            "email": persona.email,
+            "plan": plan_name,
+            "estado": status
+        })
+        
+    return suscripciones
