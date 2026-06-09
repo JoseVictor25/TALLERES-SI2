@@ -342,6 +342,15 @@ async def iniciar_servicio_asignando_recursos(
                     modelo=vehiculo.modelo
                 ))
         
+        # Enviar Notificación Push al cliente: técnico asignado
+        from app.services.notification_service import notification_service
+        await notification_service.notificar_cambio_estado_servicio(
+            db=db,
+            servicio=servicio,
+            estado_anterior="creado",
+            estado_nuevo="tecnico_asignado"
+        )
+        
         return ServicioResponse(
             id=servicio.id,
             fecha=servicio.fecha,

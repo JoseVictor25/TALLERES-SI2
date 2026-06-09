@@ -262,7 +262,7 @@ class NotificationService:
         try:
             # Obtener datos del cliente a partir de la solicitud
             result = await db.execute(
-                select(SolicitudDiagnostico, Persona).join(
+                select(SolicitudDiagnostico, Persona, Diagnostico.id).join(
                     Diagnostico, SolicitudDiagnostico.id == Diagnostico.id_solicitud_diagnostico
                 ).join(
                     SolicitudServicio, Diagnostico.id == SolicitudServicio.id_diagnostico
@@ -278,7 +278,7 @@ class NotificationService:
                 logger.warning(f"No se encontró cliente para solicitud de servicio {id_solicitud}")
                 return False
             
-            solicitud_diag, persona = row
+            solicitud_diag, persona, diagnostico_id = row
             
             # Obtener tokens FCM del cliente
             tokens = await self.obtener_tokens_persona(db, persona.id)
@@ -294,6 +294,7 @@ class NotificationService:
             datos_extra = {
                 "tipo": "solicitud_cotizada",
                 "solicitud_id": str(id_solicitud),
+                "diagnostico_id": str(diagnostico_id),
                 "costo_estimado": str(costo_estimado),
                 "accion": "abrir_cotizacion_detalle"
             }
