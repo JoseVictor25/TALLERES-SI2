@@ -10,6 +10,8 @@ class TallerResponse(BaseModel):
     email: str
     ubicacion: Optional[str] = None
     estado: str
+    creador_nombre: Optional[str] = None
+    creador_email: Optional[str] = None
 
     class Config:
         from_attributes = True

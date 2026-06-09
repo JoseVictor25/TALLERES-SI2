@@ -44,7 +44,7 @@ class CRUDTaller(CRUDBase[Taller]):
         items = result.scalars().all()
         return items, total
 
-    async def get_paginated(self, db: AsyncSession, skip: int = 0, limit: int = 10, estado: Optional[EstadoTaller] = None, tenant_id: Optional[int] = None) -> Tuple[List[Taller], int]:
+    async def get_paginated(self, db: AsyncSession, skip: int = 0, limit: int = 10, estado: Optional[EstadoTaller] = None, tenant_id: Optional[int] = None, load_options: Optional[list] = None) -> Tuple[List[Taller], int]:
         """
         Obtiene talleres paginados; si `estado` se provee, filtra por ese estado.
         Si `tenant_id` se provee, filtra por ese tenant.
@@ -57,6 +57,10 @@ class CRUDTaller(CRUDBase[Taller]):
 
         total_result = await db.execute(select(func.count()).select_from(stmt.subquery()))
         total = total_result.scalar_one()
+
+        if load_options:
+            for opt in load_options:
+                stmt = stmt.options(opt)
 
         stmt = stmt.offset(skip).limit(limit)
         result = await db.execute(stmt)

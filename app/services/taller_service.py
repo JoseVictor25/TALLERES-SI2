@@ -241,16 +241,33 @@ async def list_all_talleres_admin(
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Estado inválido")
 
-    talleres, total = await crud_taller.get_paginated(db, skip=skip, limit=limit, estado=estado_enum)
+    from sqlalchemy.orm import selectinload
+    from app.models.solicitud_afiliacion import SolicitudAfiliacion
+    from app.models.usuario import Usuario
+
+    load_opts = [
+        selectinload(Taller.solicitud).selectinload(SolicitudAfiliacion.usuario_solicita).selectinload(Usuario.persona)
+    ]
+
+    talleres, total = await crud_taller.get_paginated(db, skip=skip, limit=limit, estado=estado_enum, load_options=load_opts)
     responses = []
     for t in talleres:
+        creador_nom = None
+        creador_em = None
+        if t.solicitud and t.solicitud.usuario_solicita and t.solicitud.usuario_solicita.persona:
+            p = t.solicitud.usuario_solicita.persona
+            creador_nom = f"{p.nombre or ''} {p.apellido_p or ''}".strip()
+            creador_em = p.email
+
         responses.append(TallerResponse(
             id=t.id,
             nombre=t.nombre,
             telefono=t.telefono,
             email=t.email,
             ubicacion=_format_ubicacion(t.ubicacion),
-            estado=t.estado.value if isinstance(t.estado, EstadoTaller) else str(t.estado)
+            estado=t.estado.value if isinstance(t.estado, EstadoTaller) else str(t.estado),
+            creador_nombre=creador_nom,
+            creador_email=creador_em
         ))
     return responses, total
 
