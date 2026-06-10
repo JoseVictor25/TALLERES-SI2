@@ -53,6 +53,7 @@ class VehiculoAsignadoResponse(BaseModel):
 
 class ServicioResponse(BaseModel):
     id: int
+    numero: Optional[int] = None
     fecha: datetime
     estado: str
     id_taller: int

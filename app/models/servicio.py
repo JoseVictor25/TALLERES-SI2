@@ -19,6 +19,7 @@ class Servicio(Base):
     __tablename__ = "servicio"
 
     id = Column(Integer, primary_key=True, index=True)
+    numero = Column(Integer, nullable=True)
     fecha = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
     estado = Column(SQLEnum(EstadoServicio), nullable=False, default=EstadoServicio.creado)
     id_taller = Column(Integer, ForeignKey("taller.id", ondelete="RESTRICT"), nullable=False)

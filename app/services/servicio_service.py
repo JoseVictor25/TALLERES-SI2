@@ -206,9 +206,18 @@ async def asignar_recursos_e_iniciar_servicio(
     
     # Vehículos son opcionales, no se lanza error si está vacío
     
+    # Obtener el último número para este taller
+    from sqlalchemy import func
+    result_num = await db.execute(
+        select(func.max(Servicio.numero)).where(Servicio.id_taller == id_taller)
+    )
+    max_numero = result_num.scalar() or 0
+    nuevo_numero = max_numero + 1
+
     # Crear el servicio
     servicio_data = {
         'id_taller': id_taller,
+        'numero': nuevo_numero,
         'id_solicitud_servicio': id_solicitud,
         'estado': EstadoServicio.tecnico_asignado  # Usar el nuevo valor del enum
     }

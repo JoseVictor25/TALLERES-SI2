@@ -353,6 +353,7 @@ async def iniciar_servicio_asignando_recursos(
         
         return ServicioResponse(
             id=servicio.id,
+            numero=servicio.numero,
             fecha=servicio.fecha,
             estado=servicio.estado.value,
             id_taller=servicio.id_taller,
@@ -454,6 +455,7 @@ async def listar_servicios_en_proceso(
         
         resultado.append(ServicioResponse(
             id=servicio.id,
+            numero=servicio.numero,
             fecha=servicio.fecha,
             estado=servicio.estado.value,
             id_taller=servicio.id_taller,
@@ -520,6 +522,7 @@ async def listar_servicios_historico(
         
         resultado.append(ServicioResponse(
             id=servicio.id,
+            numero=servicio.numero,
             fecha=servicio.fecha,
             estado=servicio.estado.value,
             id_taller=servicio.id_taller,
@@ -574,6 +577,7 @@ async def completar_servicio(
         
         return ServicioResponse(
             id=servicio.id,
+            numero=servicio.numero,
             fecha=servicio.fecha,
             estado=servicio.estado.value,
             id_taller=servicio.id_taller,
@@ -633,6 +637,7 @@ async def obtener_detalle_servicio(
     
     return ServicioResponse(
         id=servicio.id,
+        numero=servicio.numero,
         fecha=servicio.fecha,
         estado=servicio.estado.value,
         id_taller=servicio.id_taller,

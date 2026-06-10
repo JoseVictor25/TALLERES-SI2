@@ -63,6 +63,7 @@ class DiagnosticoInfo(BaseModel):
 
 class ServicioTecnicoResponse(BaseModel):
     id: int
+    numero: Optional[int] = None
     fecha: datetime
     estado: str
     estado_descripcion: str
@@ -329,6 +330,7 @@ async def obtener_servicios_asignados(
         
         servicios_response.append(ServicioTecnicoResponse(
             id=servicio.id,
+            numero=servicio.numero,
             fecha=servicio.fecha,
             estado=servicio.estado.value,
             estado_descripcion=get_estado_descripcion(servicio.estado.value),
@@ -427,6 +429,7 @@ async def obtener_historial_servicios_tecnico(
         
         servicios_response.append(ServicioTecnicoResponse(
             id=servicio.id,
+            numero=servicio.numero,
             fecha=servicio.fecha,
             estado=servicio.estado.value,
             estado_descripcion=get_estado_descripcion(servicio.estado.value),
