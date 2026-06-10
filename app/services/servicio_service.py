@@ -509,3 +509,73 @@ async def cancelar_servicio_cliente(
     await db.commit()
     await db.refresh(servicio)
     return servicio
+
+async def calcular_metricas_servicio(
+    db: AsyncSession,
+    id_servicio: int
+) -> Dict[str, Optional[timedelta]]:
+    """
+    Calcula las métricas de tiempos de un servicio en base a su historial de estados.
+    """
+    from app.models.historial_estado_servicio import HistorialEstadoServicio
+    from sqlalchemy.orm import selectinload
+    import datetime
+    
+    def _ensure_tz(dt):
+        if not dt:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=datetime.timezone.utc)
+        return dt
+
+    result = await db.execute(
+        select(Servicio).where(Servicio.id == id_servicio).options(selectinload(Servicio.solicitud_servicio))
+    )
+    servicio = result.scalar_one_or_none()
+    
+    if not servicio:
+        raise ValueError("Servicio no encontrado")
+        
+    solicitud = servicio.solicitud_servicio
+    
+    result_historial = await db.execute(
+        select(HistorialEstadoServicio).where(
+            HistorialEstadoServicio.id_servicio == id_servicio
+        ).order_by(HistorialEstadoServicio.tiempo.asc())
+    )
+    historial = result_historial.scalars().all()
+    
+    tiempos_estados = {h.estado: _ensure_tz(h.tiempo) for h in historial}
+    
+    tiempo_respuesta = None
+    tiempo_llegada = None
+    tiempo_resolucion = None
+    tiempo_total = None
+    
+    if solicitud and solicitud.fecha and solicitud.fecha_aceptada:
+        f_solic = _ensure_tz(solicitud.fecha)
+        f_acept = _ensure_tz(solicitud.fecha_aceptada)
+        if f_acept and f_solic:
+            tiempo_respuesta = f_acept - f_solic
+            
+    tiempo_aceptacion = _ensure_tz(solicitud.fecha_aceptada) if solicitud else None
+    tiempo_en_lugar = tiempos_estados.get(EstadoServicio.en_lugar)
+    
+    if tiempo_aceptacion and tiempo_en_lugar:
+        tiempo_llegada = tiempo_en_lugar - tiempo_aceptacion
+        
+    tiempo_finalizado = tiempos_estados.get(EstadoServicio.finalizado)
+    
+    if tiempo_en_lugar and tiempo_finalizado:
+        tiempo_resolucion = tiempo_finalizado - tiempo_en_lugar
+        
+    if solicitud and solicitud.fecha and tiempo_finalizado:
+        f_solic = _ensure_tz(solicitud.fecha)
+        tiempo_total = tiempo_finalizado - f_solic
+        
+    return {
+        'tiempo_respuesta': tiempo_respuesta,
+        'tiempo_llegada': tiempo_llegada,
+        'tiempo_resolucion': tiempo_resolucion,
+        'tiempo_total': tiempo_total
+    }
