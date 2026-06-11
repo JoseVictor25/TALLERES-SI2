@@ -25,14 +25,24 @@ logger = logging.getLogger(__name__)
 # Initialize Firebase Admin
 try:
     if not firebase_admin._apps:
-        # Buscamos el archivo JSON generado
-        cred_path = os.path.join(os.getcwd(), 'talleres.json')
-        if os.path.exists(cred_path):
-            cred = credentials.Certificate(cred_path)
-            firebase_admin.initialize_app(cred)
-            logger.info("Firebase Admin inicializado exitosamente.")
+        firebase_env = os.getenv('FIREBASE_CREDENTIALS_JSON')
+        if firebase_env:
+            try:
+                cred_dict = json.loads(firebase_env)
+                cred = credentials.Certificate(cred_dict)
+                firebase_admin.initialize_app(cred)
+                logger.info("Firebase Admin inicializado exitosamente desde variable de entorno.")
+            except Exception as env_e:
+                logger.error(f"Error parseando FIREBASE_CREDENTIALS_JSON: {env_e}")
         else:
-            logger.warning(f"No se encontró el archivo de credenciales de Firebase en {cred_path}")
+            # Buscamos el archivo JSON generado
+            cred_path = os.path.join(os.getcwd(), 'talleres.json')
+            if os.path.exists(cred_path):
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+                logger.info("Firebase Admin inicializado exitosamente desde archivo.")
+            else:
+                logger.warning(f"No se encontraron credenciales de Firebase (ni env var ni archivo en {cred_path})")
 except Exception as e:
     logger.error(f"Error inicializando Firebase Admin: {e}")
 
