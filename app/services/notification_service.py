@@ -260,18 +260,14 @@ class NotificationService:
         Notifica al cliente que un taller ha respondido con una cotización
         """
         try:
-            from app.models.taller import Taller
-            
-            # Obtener datos del cliente y del taller a partir de la solicitud
+            # 1) Obtener datos del cliente
             result = await db.execute(
-                select(SolicitudDiagnostico, Persona, Diagnostico.id, Taller.nombre).join(
+                select(SolicitudDiagnostico, Persona, Diagnostico.id).join(
                     Diagnostico, SolicitudDiagnostico.id == Diagnostico.id_solicitud_diagnostico
                 ).join(
                     SolicitudServicio, Diagnostico.id == SolicitudServicio.id_diagnostico
                 ).join(
                     Persona, SolicitudDiagnostico.id_persona == Persona.id
-                ).outerjoin(
-                    Taller, SolicitudServicio.id_taller == Taller.id
                 ).where(
                     SolicitudServicio.id == id_solicitud
                 )
@@ -282,8 +278,22 @@ class NotificationService:
                 logger.warning(f"No se encontró cliente para solicitud de servicio {id_solicitud}")
                 return False
             
-            solicitud_diag, persona, diagnostico_id, nombre_taller = row
-            nombre_taller = nombre_taller or "Un taller"
+            solicitud_diag, persona, diagnostico_id = row
+            
+            # 2) Obtener nombre del taller
+            nombre_taller = "Un taller"
+            try:
+                from app.models.taller import Taller
+                result_taller = await db.execute(
+                    select(Taller.nombre).join(
+                        SolicitudServicio, SolicitudServicio.id_taller == Taller.id
+                    ).where(SolicitudServicio.id == id_solicitud)
+                )
+                nombre_row = result_taller.scalar_one_or_none()
+                if nombre_row:
+                    nombre_taller = nombre_row
+            except Exception as e:
+                logger.warning(f"No se pudo obtener nombre del taller: {e}")
             
             # Obtener tokens FCM del cliente
             tokens = await self.obtener_tokens_persona(db, persona.id)
@@ -305,6 +315,7 @@ class NotificationService:
                 "accion": "abrir_cotizacion_detalle"
             }
             
+            logger.info(f"Enviando push cotización a persona {persona.id}: {titulo}")
             return await self.enviar_notificacion_push(tokens, titulo, mensaje, datos_extra)
             
         except Exception as e:
