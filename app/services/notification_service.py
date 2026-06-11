@@ -260,14 +260,18 @@ class NotificationService:
         Notifica al cliente que un taller ha respondido con una cotización
         """
         try:
-            # Obtener datos del cliente a partir de la solicitud
+            from app.models.taller import Taller
+            
+            # Obtener datos del cliente y del taller a partir de la solicitud
             result = await db.execute(
-                select(SolicitudDiagnostico, Persona, Diagnostico.id).join(
+                select(SolicitudDiagnostico, Persona, Diagnostico.id, Taller.nombre).join(
                     Diagnostico, SolicitudDiagnostico.id == Diagnostico.id_solicitud_diagnostico
                 ).join(
                     SolicitudServicio, Diagnostico.id == SolicitudServicio.id_diagnostico
                 ).join(
                     Persona, SolicitudDiagnostico.id_persona == Persona.id
+                ).outerjoin(
+                    Taller, SolicitudServicio.id_taller == Taller.id
                 ).where(
                     SolicitudServicio.id == id_solicitud
                 )
@@ -278,7 +282,8 @@ class NotificationService:
                 logger.warning(f"No se encontró cliente para solicitud de servicio {id_solicitud}")
                 return False
             
-            solicitud_diag, persona, diagnostico_id = row
+            solicitud_diag, persona, diagnostico_id, nombre_taller = row
+            nombre_taller = nombre_taller or "Un taller"
             
             # Obtener tokens FCM del cliente
             tokens = await self.obtener_tokens_persona(db, persona.id)
@@ -288,14 +293,15 @@ class NotificationService:
                 return True
             
             # Enviar notificación
-            titulo = "¡Cotización Recibida!"
-            mensaje = f"Un taller ha enviado una cotización de {costo_estimado} BOB. Revisa los detalles en la app."
+            titulo = f"¡{nombre_taller} te envió una cotización!"
+            mensaje = f"{nombre_taller} ha cotizado tu servicio por Bs {costo_estimado}. Revisa los detalles y decide."
             
             datos_extra = {
                 "tipo": "solicitud_cotizada",
                 "solicitud_id": str(id_solicitud),
                 "diagnostico_id": str(diagnostico_id),
                 "costo_estimado": str(costo_estimado),
+                "nombre_taller": nombre_taller,
                 "accion": "abrir_cotizacion_detalle"
             }
             
